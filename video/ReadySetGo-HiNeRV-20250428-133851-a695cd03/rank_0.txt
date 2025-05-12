@@ -1,0 +1,779 @@
+[2025-04-28 13:38:51,890] INFO - Torch version: 2.6.0+cu124
+[2025-04-28 13:38:51,891] INFO - World size: 1
+[2025-04-28 13:38:51,891] INFO - Rank: 0    Local rank: 0    Device: cuda
+[2025-04-28 13:38:51,891] INFO - Device name: NVIDIA GeForce RTX 3050 Ti Laptop GPU
+[2025-04-28 13:38:51,891] INFO - Output dir: /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03
+[2025-04-28 13:38:51,891] INFO - Set seed: 0
+[2025-04-28 13:38:51,895] INFO - VideoRegressionTask:
+[2025-04-28 13:38:51,895] INFO -      Root: /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/train_output
+[2025-04-28 13:38:51,895] INFO -      Losses: ['0.7', 'l1', '0.3', 'ms-ssim_5x5']    Metrics: ['psnr']    Regularization: []
+[2025-04-28 13:38:51,895] INFO -      Training: True
+[2025-04-28 13:38:51,895] INFO -      Log evaulation: False
+[2025-04-28 13:38:51,895] INFO - VideoRegressionTask:
+[2025-04-28 13:38:51,895] INFO -      Root: /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/eval_output
+[2025-04-28 13:38:51,895] INFO -      Losses: ['0.7', 'l1', '0.3', 'ms-ssim_5x5']    Metrics: ['psnr', 'ms-ssim']    Regularization: []
+[2025-04-28 13:38:51,896] INFO -      Training: False
+[2025-04-28 13:38:51,896] INFO -      Log evaulation: True
+[2025-04-28 13:38:52,269] INFO - Create training dataset & loader: /home/hayfa/projects/HiNeRV/Datasets/UVG/1920x1080/ReadySetGo
+[2025-04-28 13:38:55,253] INFO - VideoDataset:
+[2025-04-28 13:38:55,253] INFO -      root: /home/hayfa/projects/HiNeRV/Datasets/UVG/1920x1080    name: ReadySetGo    number of images: 61
+[2025-04-28 13:38:55,253] INFO -      video_size: (61, 1080, 1920)    patch_size: (1, 120, 120)    num_patches: (61, 9, 16)
+[2025-04-28 13:38:55,253] INFO -      cached: patch
+[2025-04-28 13:38:55,254] INFO - Create evaluation dataset & loader: /home/hayfa/projects/HiNeRV/Datasets/UVG/1920x1080/ReadySetGo
+[2025-04-28 13:38:57,894] INFO - VideoDataset:
+[2025-04-28 13:38:57,894] INFO -      root: /home/hayfa/projects/HiNeRV/Datasets/UVG/1920x1080    name: ReadySetGo    number of images: 61
+[2025-04-28 13:38:57,894] INFO -      video_size: (61, 1080, 1920)    patch_size: (1, 1080, 1920)    num_patches: (61, 1, 1)
+[2025-04-28 13:38:57,895] INFO -      cached: patch
+[2025-04-28 13:38:57,895] INFO - Create model: HiNeRV
+[2025-04-28 13:38:58,264] INFO - Building HiNeRV Encoding with cfg: {'size': (61, 18, 32), 'channels': 6, 'grid_size': [150, 18, 32, 2], 'grid_level': 2, 'grid_level_scale': [2.0, 1.0, 1.0, 0.5], 'grid_init_scale': 0.001}
+[2025-04-28 13:38:58,271] INFO - Building HiNeRV Decoder with cfg: {'input_size': (61, 18, 32), 'input_channels': 6, 'output_size': (61, 1080, 1920), 'output_channels': 3, 'channels': 280, 'channels_reduce': 2.0, 'channels_reduce_base': 1, 'channels_min': 1, 'depths': [3, 3, 3, 1], 'exps': [4.0, 4.0, 4.0, 1.0], 'scales': [[1, 5, 5], [1, 3, 3], [1, 2, 2], [1, 2, 2]], 'stem_kernels': 3, 'kernels': [3, 3, 3, 3], 'stem_paddings': (0, 3, 3), 'paddings': [[0, 6, 6], [0, 6, 6], [0, 4, 4], [0, 1, 1]], 'block_cfg': {'type': 'convnext', 'norm': 'layernorm-no-affine', 'act': 'gelu', 'layerscale': 0.0, 'dropout': 0.0, 'droppath': 0.0, 'bias': False}, 'stem_cfg': {'kernels': 3, 'paddings': [-1, -1, -1], 'type': 'conv_stem', 'norm': 'none', 'act': 'none', 'layerscale': 0.0, 'dropout': 0.0, 'droppath': 0.0, 'bias': True}, 'head_cfg': {'type': 'linear_head', 'norm': 'none', 'act': 'sigmoid', 'layerscale': 0.0, 'dropout': 0.0, 'droppath': 0.0, 'bias': True}, 'enc_cfg': {'type': 'normalized+temp_local_grid', 'align_corners': False, 'pe': [1.2, 60, 1.2, 60], 'pe_no_t': False, 'grid_size': [-1, 4], 'grid_level': 3, 'grid_level_scale': [2.0, 0.5], 'grid_init_scale': 0.001, 'grid_depth_scale': [1.0, 0.5]}, 'upsample_cfg': {'type': 'trilinear', 'config': 'matmul-th-w', 'norm': 'layernorm-no-affine', 'act': 'none'}}
+[2025-04-28 13:38:58,271] INFO - HiNeRV:
+[2025-04-28 13:38:58,273] INFO -      Stage 1:  T1 - 61  H1 - 18  W1 - 32  C1 - 280
+[2025-04-28 13:38:58,273] INFO -                      T2 - 61  H2 - 90  W2 - 160  C2 - 280
+[2025-04-28 13:38:58,273] INFO -                      Depth - 3  Exp - 4.0  Kernel - 3
+[2025-04-28 13:38:58,273] INFO -                      Scale - (1, 5, 5)  Padding - (0, 6, 6)
+[2025-04-28 13:38:58,293] INFO -      Stage 2:  T1 - 61  H1 - 90  W1 - 160  C1 - 280
+[2025-04-28 13:38:58,293] INFO -                      T2 - 61  H2 - 270  W2 - 480  C2 - 140
+[2025-04-28 13:38:58,293] INFO -                      Depth - 3  Exp - 4.0  Kernel - 3
+[2025-04-28 13:38:58,294] INFO -                      Scale - (1, 3, 3)  Padding - (0, 6, 6)
+[2025-04-28 13:38:58,304] INFO -      Stage 3:  T1 - 61  H1 - 270  W1 - 480  C1 - 140
+[2025-04-28 13:38:58,304] INFO -                      T2 - 61  H2 - 540  W2 - 960  C2 - 70
+[2025-04-28 13:38:58,305] INFO -                      Depth - 3  Exp - 4.0  Kernel - 3
+[2025-04-28 13:38:58,305] INFO -                      Scale - (1, 2, 2)  Padding - (0, 4, 4)
+[2025-04-28 13:38:58,309] INFO -      Stage 4:  T1 - 61  H1 - 540  W1 - 960  C1 - 70
+[2025-04-28 13:38:58,309] INFO -                      T2 - 61  H2 - 1080  W2 - 1920  C2 - 35
+[2025-04-28 13:38:58,309] INFO -                      Depth - 1  Exp - 1.0  Kernel - 3
+[2025-04-28 13:38:58,309] INFO -                      Scale - (1, 2, 2)  Padding - (0, 1, 1)
+[2025-04-28 13:38:58,312] INFO -      Output channels: 3
+[2025-04-28 13:38:58,313] INFO - Building HiNeRV with cfg: {'eval_patch_size': None}
+[2025-04-28 13:38:58,313] INFO - Model info:
+[2025-04-28 13:38:58,314] INFO - HiNeRV(
+  (encoding): HiNeRVEncoding(
+    size=(61, 18, 32), channels=6, grid_level=2, grid_sizes=[(150, 18, 32, 2), (75, 18, 32, 4)]
+    (grids): ParameterList(
+        (0): Object of type: FeatureGrid
+        (1): Object of type: FeatureGrid
+      (0): FeatureGrid()
+      (1): FeatureGrid()
+    )
+    (grid_expands): ModuleList(
+      (0-1): 2 x GridTrilinear3D()
+    )
+  )
+  (decoder): HiNeRVDecoder(
+    input_size=(61, 18, 32), input_channels=6, ouput_size=(61, 1080, 1920), output_channels=3
+    (stem): Conv2dBlock(
+      (conv): Conv2d(6, 280, kernel_size=(3, 3), stride=(1, 1), padding=same)
+      (norm): Identity()
+      (act): Identity()
+    )
+    (blocks): ModuleList(
+      (0): ModuleList(
+        (0): HiNeRVUpsampler(
+          scale=(1, 5, 5), upsample_type=trilinear
+          (norm): LayerNorm((280,), eps=1e-06, elementwise_affine=False)
+          (act): Identity()
+          (layer): FastTrilinearInterpolation(method=matmul-th-w, align_corners=False)
+        )
+        (1): PositionalEncoder(
+          scale=(1, 5, 5), channels=280, coor_type=normalized, enc_type=temp_local_grid
+          (coor): NormalizedCoordinate(align_corners=False)
+          (enc): TemporalLocalGridEncoding(
+            C=280, grid_sizes=[(61, 1, 1, 1, 5, 5, 4), (30, 1, 1, 1, 5, 5, 8), (15, 1, 1, 1, 5, 5, 16)], grid_level=3, grid_level_scale=(2.0, 1, 1, 0.5), init_scale=0.001, align_corners=False
+            (grids): ModuleList(
+              (0-2): 3 x FeatureGrid()
+            )
+            (linear): Linear(in_features=28, out_features=280, bias=True)
+          )
+        )
+        (2-4): 3 x ConvNeXtBlock(
+          in_features=280, out_features=280, layerscale_init=0.0
+          (dconv): Conv2d(280, 280, kernel_size=(3, 3), stride=(1, 1), padding=same, groups=280, bias=False)
+          (norm): LayerNorm((280,), eps=1e-06, elementwise_affine=False)
+          (fc1): Linear(in_features=280, out_features=1120, bias=False)
+          (act): GELU(approximate='none')
+          (dropout1): Dropout(p=0.0, inplace=False)
+          (fc2): Linear(in_features=1120, out_features=280, bias=False)
+          (dropout2): Dropout(p=0.0, inplace=False)
+        )
+      )
+      (1): ModuleList(
+        (0): HiNeRVUpsampler(
+          scale=(1, 3, 3), upsample_type=trilinear
+          (norm): LayerNorm((280,), eps=1e-06, elementwise_affine=False)
+          (act): Identity()
+          (layer): FastTrilinearInterpolation(method=matmul-th-w, align_corners=False)
+        )
+        (1): PositionalEncoder(
+          scale=(1, 3, 3), channels=280, coor_type=normalized, enc_type=temp_local_grid
+          (coor): NormalizedCoordinate(align_corners=False)
+          (enc): TemporalLocalGridEncoding(
+            C=280, grid_sizes=[(61, 1, 1, 1, 3, 3, 2), (30, 1, 1, 1, 3, 3, 4), (15, 1, 1, 1, 3, 3, 8)], grid_level=3, grid_level_scale=(2.0, 1, 1, 0.5), init_scale=0.001, align_corners=False
+            (grids): ModuleList(
+              (0-2): 3 x FeatureGrid()
+            )
+            (linear): Linear(in_features=14, out_features=280, bias=True)
+          )
+        )
+        (2): ConvNeXtBlock(
+          in_features=280, out_features=140, layerscale_init=0.0
+          (dconv): Conv2d(280, 280, kernel_size=(3, 3), stride=(1, 1), padding=same, groups=280, bias=False)
+          (norm): LayerNorm((280,), eps=1e-06, elementwise_affine=False)
+          (fc1): Linear(in_features=280, out_features=560, bias=False)
+          (act): GELU(approximate='none')
+          (dropout1): Dropout(p=0.0, inplace=False)
+          (fc2): Linear(in_features=560, out_features=140, bias=False)
+          (dropout2): Dropout(p=0.0, inplace=False)
+        )
+        (3-4): 2 x ConvNeXtBlock(
+          in_features=140, out_features=140, layerscale_init=0.0
+          (dconv): Conv2d(140, 140, kernel_size=(3, 3), stride=(1, 1), padding=same, groups=140, bias=False)
+          (norm): LayerNorm((140,), eps=1e-06, elementwise_affine=False)
+          (fc1): Linear(in_features=140, out_features=560, bias=False)
+          (act): GELU(approximate='none')
+          (dropout1): Dropout(p=0.0, inplace=False)
+          (fc2): Linear(in_features=560, out_features=140, bias=False)
+          (dropout2): Dropout(p=0.0, inplace=False)
+        )
+      )
+      (2): ModuleList(
+        (0): HiNeRVUpsampler(
+          scale=(1, 2, 2), upsample_type=trilinear
+          (norm): LayerNorm((140,), eps=1e-06, elementwise_affine=False)
+          (act): Identity()
+          (layer): FastTrilinearInterpolation(method=matmul-th-w, align_corners=False)
+        )
+        (1): PositionalEncoder(
+          scale=(1, 2, 2), channels=140, coor_type=normalized, enc_type=temp_local_grid
+          (coor): NormalizedCoordinate(align_corners=False)
+          (enc): TemporalLocalGridEncoding(
+            C=140, grid_sizes=[(61, 1, 1, 1, 2, 2, 1), (30, 1, 1, 1, 2, 2, 2), (15, 1, 1, 1, 2, 2, 4)], grid_level=3, grid_level_scale=(2.0, 1, 1, 0.5), init_scale=0.001, align_corners=False
+            (grids): ModuleList(
+              (0-2): 3 x FeatureGrid()
+            )
+            (linear): Linear(in_features=7, out_features=140, bias=True)
+          )
+        )
+        (2): ConvNeXtBlock(
+          in_features=140, out_features=70, layerscale_init=0.0
+          (dconv): Conv2d(140, 140, kernel_size=(3, 3), stride=(1, 1), padding=same, groups=140, bias=False)
+          (norm): LayerNorm((140,), eps=1e-06, elementwise_affine=False)
+          (fc1): Linear(in_features=140, out_features=280, bias=False)
+          (act): GELU(approximate='none')
+          (dropout1): Dropout(p=0.0, inplace=False)
+          (fc2): Linear(in_features=280, out_features=70, bias=False)
+          (dropout2): Dropout(p=0.0, inplace=False)
+        )
+        (3-4): 2 x ConvNeXtBlock(
+          in_features=70, out_features=70, layerscale_init=0.0
+          (dconv): Conv2d(70, 70, kernel_size=(3, 3), stride=(1, 1), padding=same, groups=70, bias=False)
+          (norm): LayerNorm((70,), eps=1e-06, elementwise_affine=False)
+          (fc1): Linear(in_features=70, out_features=280, bias=False)
+          (act): GELU(approximate='none')
+          (dropout1): Dropout(p=0.0, inplace=False)
+          (fc2): Linear(in_features=280, out_features=70, bias=False)
+          (dropout2): Dropout(p=0.0, inplace=False)
+        )
+      )
+      (3): ModuleList(
+        (0): HiNeRVUpsampler(
+          scale=(1, 2, 2), upsample_type=trilinear
+          (norm): LayerNorm((70,), eps=1e-06, elementwise_affine=False)
+          (act): Identity()
+          (layer): FastTrilinearInterpolation(method=matmul-th-w, align_corners=False)
+        )
+        (1): PositionalEncoder(
+          scale=(1, 2, 2), channels=70, coor_type=normalized, enc_type=temp_local_grid
+          (coor): NormalizedCoordinate(align_corners=False)
+          (enc): TemporalLocalGridEncoding(
+            C=70, grid_sizes=[(61, 1, 1, 1, 2, 2, 1), (30, 1, 1, 1, 2, 2, 2), (15, 1, 1, 1, 2, 2, 4)], grid_level=3, grid_level_scale=(2.0, 1, 1, 0.5), init_scale=0.001, align_corners=False
+            (grids): ModuleList(
+              (0-2): 3 x FeatureGrid()
+            )
+            (linear): Linear(in_features=7, out_features=70, bias=True)
+          )
+        )
+        (2): ConvNeXtBlock(
+          in_features=70, out_features=35, layerscale_init=0.0
+          (dconv): Conv2d(70, 70, kernel_size=(3, 3), stride=(1, 1), padding=same, groups=70, bias=False)
+          (norm): LayerNorm((70,), eps=1e-06, elementwise_affine=False)
+          (fc1): Linear(in_features=70, out_features=35, bias=False)
+          (act): GELU(approximate='none')
+          (dropout1): Dropout(p=0.0, inplace=False)
+          (fc2): Linear(in_features=35, out_features=35, bias=False)
+          (dropout2): Dropout(p=0.0, inplace=False)
+        )
+      )
+    )
+    (head): LinearBlock(
+      (linear): Linear(in_features=35, out_features=3, bias=True)
+      (norm): Identity()
+      (act): Sigmoid()
+    )
+  )
+)
+[2025-04-28 13:38:58,316] INFO - Number of parameters:
+[2025-04-28 13:38:58,316] INFO -     All: 2.98M
+[2025-04-28 13:38:58,316] INFO -     Decoder: 2.64M
+[2025-04-28 13:38:58,316] INFO -     Model: 2.64M
+[2025-04-28 13:38:58,316] INFO -     Encoding: 0.35M
+[2025-04-28 13:38:58,317] INFO -     Upsampling Encoding: 0.00M
+[2025-04-28 13:39:17,376] INFO - MACs: 181.86G
+[2025-04-28 13:39:17,509] INFO - Create scheduler: cosine
+[2025-04-28 13:39:17,510] INFO - Create optimizer & scheduler for main stage
+[2025-04-28 13:39:17,510] INFO - Autoscale learning rates:
+[2025-04-28 13:39:17,510] INFO -          lr - 2.78e-05
+[2025-04-28 13:39:17,510] INFO -          warmup_lr - 2.78e-07
+[2025-04-28 13:39:17,510] INFO -          min_lr - 2.78e-07
+[2025-04-28 13:39:17,511] INFO - Create optimizer & scheduler for prune stage
+[2025-04-28 13:39:17,512] INFO - Autoscale learning rates:
+[2025-04-28 13:39:17,512] INFO -          lr - 2.78e-05
+[2025-04-28 13:39:17,512] INFO -          warmup_lr - 2.78e-07
+[2025-04-28 13:39:17,512] INFO -          min_lr - 2.78e-07
+[2025-04-28 13:39:17,513] INFO - Create optimizer & scheduler for quant stage
+[2025-04-28 13:39:17,513] INFO - Autoscale learning rates:
+[2025-04-28 13:39:17,513] INFO -          lr - 2.78e-06
+[2025-04-28 13:39:17,513] INFO -          warmup_lr - 2.78e-08
+[2025-04-28 13:39:17,513] INFO -          min_lr - 2.78e-08
+[2025-04-28 13:39:17,515] INFO - Start training for 90 epochs.
+[2025-04-28 13:39:17,515] INFO -     Number of training epochs: 30
+[2025-04-28 13:39:17,515] INFO -     Number of pruning fine-tuning epochs: 30
+[2025-04-28 13:39:17,515] INFO -     Number of quant fine-tuning epochs: 30
+[2025-04-28 13:39:17,571] INFO - Start main training for 30 epochs.
+[2025-04-28 13:41:48,041] INFO - Train - Epoch 0 [1098/4392]    lr: 9.65e-07    img/s: 0.10    loss: 0.3543    psnr: 11.6514
+[2025-04-28 13:42:19,860] INFO - Train - Epoch 0 [2196/4392]    lr: 1.65e-06    img/s: 0.17    loss: 0.3469    psnr: 12.0613
+[2025-04-28 13:42:52,395] INFO - Train - Epoch 0 [3294/4392]    lr: 2.34e-06    img/s: 0.21    loss: 0.3421    psnr: 12.3071
+[2025-04-28 13:43:25,862] INFO - Train - Epoch 0 [4392/4392]    lr: 3.03e-06    img/s: 0.25    loss: 0.3390    psnr: 12.4754
+[2025-04-28 13:43:58,423] INFO - Train - Epoch 1 [1098/4392]    lr: 3.71e-06    img/s: 0.47    loss: 0.3084    psnr: 13.8851
+[2025-04-28 13:44:32,882] INFO - Train - Epoch 1 [2196/4392]    lr: 4.40e-06    img/s: 0.46    loss: 0.3015    psnr: 14.2787
+[2025-04-28 13:45:05,497] INFO - Train - Epoch 1 [3294/4392]    lr: 5.09e-06    img/s: 0.46    loss: 0.2936    psnr: 14.6824
+[2025-04-28 13:45:38,325] INFO - Train - Epoch 1 [4392/4392]    lr: 5.78e-06    img/s: 0.46    loss: 0.2862    psnr: 15.0988
+[2025-04-28 13:46:12,148] INFO - Train - Epoch 2 [1098/4392]    lr: 6.46e-06    img/s: 0.45    loss: 0.2514    psnr: 17.0274
+[2025-04-28 13:46:45,624] INFO - Train - Epoch 2 [2196/4392]    lr: 7.15e-06    img/s: 0.45    loss: 0.2471    psnr: 17.2373
+[2025-04-28 13:47:16,269] INFO - Train - Epoch 2 [3294/4392]    lr: 7.84e-06    img/s: 0.47    loss: 0.2454    psnr: 17.3683
+[2025-04-28 13:47:47,472] INFO - Train - Epoch 2 [4392/4392]    lr: 8.53e-06    img/s: 0.47    loss: 0.2425    psnr: 17.5389
+[2025-04-28 13:48:19,853] INFO - Train - Epoch 3 [1098/4392]    lr: 9.21e-06    img/s: 0.47    loss: 0.2205    psnr: 18.4019
+[2025-04-28 13:48:52,628] INFO - Train - Epoch 3 [2196/4392]    lr: 9.90e-06    img/s: 0.47    loss: 0.2202    psnr: 18.4181
+[2025-04-28 13:49:25,510] INFO - Train - Epoch 3 [3294/4392]    lr: 1.06e-05    img/s: 0.47    loss: 0.2200    psnr: 18.4431
+[2025-04-28 13:49:58,556] INFO - Train - Epoch 3 [4392/4392]    lr: 1.13e-05    img/s: 0.47    loss: 0.2196    psnr: 18.4782
+[2025-04-28 13:50:34,389] INFO - Train - Epoch 4 [1098/4392]    lr: 1.20e-05    img/s: 0.43    loss: 0.2045    psnr: 19.0187
+[2025-04-28 13:51:05,254] INFO - Train - Epoch 4 [2196/4392]    lr: 1.27e-05    img/s: 0.46    loss: 0.2010    psnr: 19.1709
+[2025-04-28 13:51:38,673] INFO - Train - Epoch 4 [3294/4392]    lr: 1.33e-05    img/s: 0.46    loss: 0.1998    psnr: 19.2265
+[2025-04-28 13:52:09,809] INFO - Train - Epoch 4 [4392/4392]    lr: 1.40e-05    img/s: 0.46    loss: 0.1990    psnr: 19.2798
+[2025-04-28 13:52:42,640] INFO - Train - Epoch 5 [1098/4392]    lr: 1.47e-05    img/s: 0.46    loss: 0.1844    psnr: 19.9119
+[2025-04-28 13:53:14,714] INFO - Train - Epoch 5 [2196/4392]    lr: 1.54e-05    img/s: 0.47    loss: 0.1842    psnr: 19.8794
+[2025-04-28 13:53:48,624] INFO - Train - Epoch 5 [3294/4392]    lr: 1.61e-05    img/s: 0.46    loss: 0.1818    psnr: 19.9840
+[2025-04-28 13:54:23,389] INFO - Train - Epoch 5 [4392/4392]    lr: 1.68e-05    img/s: 0.46    loss: 0.1811    psnr: 19.9962
+[2025-04-28 13:55:02,212] INFO - Train - Epoch 6 [1098/4392]    lr: 1.75e-05    img/s: 0.39    loss: 0.1682    psnr: 20.5180
+[2025-04-28 13:55:34,014] INFO - Train - Epoch 6 [2196/4392]    lr: 1.82e-05    img/s: 0.43    loss: 0.1666    psnr: 20.5392
+[2025-04-28 13:56:06,494] INFO - Train - Epoch 6 [3294/4392]    lr: 1.88e-05    img/s: 0.44    loss: 0.1651    psnr: 20.6233
+[2025-04-28 13:56:36,737] INFO - Train - Epoch 6 [4392/4392]    lr: 1.95e-05    img/s: 0.46    loss: 0.1646    psnr: 20.6374
+[2025-04-28 13:57:09,150] INFO - Train - Epoch 7 [1098/4392]    lr: 2.02e-05    img/s: 0.47    loss: 0.1553    psnr: 20.8845
+[2025-04-28 13:57:44,760] INFO - Train - Epoch 7 [2196/4392]    lr: 2.09e-05    img/s: 0.45    loss: 0.1533    psnr: 21.0102
+[2025-04-28 13:58:19,431] INFO - Train - Epoch 7 [3294/4392]    lr: 2.16e-05    img/s: 0.45    loss: 0.1521    psnr: 21.0914
+[2025-04-28 13:58:51,319] INFO - Train - Epoch 7 [4392/4392]    lr: 2.23e-05    img/s: 0.45    loss: 0.1505    psnr: 21.1793
+[2025-04-28 13:59:23,530] INFO - Train - Epoch 8 [1098/4392]    lr: 2.30e-05    img/s: 0.47    loss: 0.1396    psnr: 21.7069
+[2025-04-28 13:59:56,522] INFO - Train - Epoch 8 [2196/4392]    lr: 2.37e-05    img/s: 0.47    loss: 0.1385    psnr: 21.6837
+[2025-04-28 14:00:30,443] INFO - Train - Epoch 8 [3294/4392]    lr: 2.43e-05    img/s: 0.46    loss: 0.1374    psnr: 21.7129
+[2025-04-28 14:01:02,009] INFO - Train - Epoch 8 [4392/4392]    lr: 2.50e-05    img/s: 0.47    loss: 0.1368    psnr: 21.7135
+[2025-04-28 14:01:35,504] INFO - Train - Epoch 9 [1098/4392]    lr: 2.57e-05    img/s: 0.46    loss: 0.1273    psnr: 22.0664
+[2025-04-28 14:02:09,931] INFO - Train - Epoch 9 [2196/4392]    lr: 2.64e-05    img/s: 0.45    loss: 0.1257    psnr: 22.1542
+[2025-04-28 14:02:43,057] INFO - Train - Epoch 9 [3294/4392]    lr: 2.71e-05    img/s: 0.45    loss: 0.1248    psnr: 22.1747
+[2025-04-28 14:03:16,191] INFO - Train - Epoch 9 [4392/4392]    lr: 2.78e-05    img/s: 0.45    loss: 0.1245    psnr: 22.2025
+[2025-04-28 14:04:19,051] INFO - Eval - [15/61]    img/s: 0.24    loss: 0.1239    psnr: 20.1243    ms-ssim: 0.7278
+[2025-04-28 14:04:22,133] INFO - Eval - [30/61]    img/s: 0.45    loss: 0.1216    psnr: 20.2072    ms-ssim: 0.7329
+[2025-04-28 14:04:25,205] INFO - Eval - [45/61]    img/s: 0.65    loss: 0.1206    psnr: 20.2340    ms-ssim: 0.7350
+[2025-04-28 14:04:28,268] INFO - Eval - [60/61]    img/s: 0.83    loss: 0.1203    psnr: 20.2692    ms-ssim: 0.7351
+[2025-04-28 14:04:28,472] INFO - Eval - [61/61]    img/s: 0.84    loss: 0.1204    psnr: 20.2621    ms-ssim: 0.7348
+[2025-04-28 14:04:28,473] INFO - ***        psnr: 20.2621 ms-ssim: 0.7348  @ 2.98M
+[2025-04-28 14:04:28,643] INFO - Saving new best checkpoint: /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/checkpoints/checkpoint_best
+[2025-04-28 14:05:02,050] INFO - Train - Epoch 10 [1098/4392]    lr: 2.06e-05    img/s: 0.46    loss: 0.1127    psnr: 22.7686
+[2025-04-28 14:05:36,873] INFO - Train - Epoch 10 [2196/4392]    lr: 2.03e-05    img/s: 0.45    loss: 0.1111    psnr: 22.9520
+[2025-04-28 14:06:14,999] INFO - Train - Epoch 10 [3294/4392]    lr: 1.99e-05    img/s: 0.43    loss: 0.1097    psnr: 22.9704
+[2025-04-28 14:06:51,262] INFO - Train - Epoch 10 [4392/4392]    lr: 1.96e-05    img/s: 0.43    loss: 0.1085    psnr: 23.0493
+[2025-04-28 14:07:26,412] INFO - Train - Epoch 11 [1098/4392]    lr: 1.93e-05    img/s: 0.43    loss: 0.0975    psnr: 23.6563
+[2025-04-28 14:08:03,755] INFO - Train - Epoch 11 [2196/4392]    lr: 1.90e-05    img/s: 0.42    loss: 0.0970    psnr: 23.6979
+[2025-04-28 14:08:39,666] INFO - Train - Epoch 11 [3294/4392]    lr: 1.86e-05    img/s: 0.42    loss: 0.0955    psnr: 23.8266
+[2025-04-28 14:09:14,127] INFO - Train - Epoch 11 [4392/4392]    lr: 1.83e-05    img/s: 0.43    loss: 0.0951    psnr: 23.8557
+[2025-04-28 14:09:48,533] INFO - Train - Epoch 12 [1098/4392]    lr: 1.79e-05    img/s: 0.44    loss: 0.0882    psnr: 24.3352
+[2025-04-28 14:10:23,942] INFO - Train - Epoch 12 [2196/4392]    lr: 1.76e-05    img/s: 0.44    loss: 0.0874    psnr: 24.4276
+[2025-04-28 14:10:57,959] INFO - Train - Epoch 12 [3294/4392]    lr: 1.72e-05    img/s: 0.44    loss: 0.0869    psnr: 24.3999
+[2025-04-28 14:11:31,511] INFO - Train - Epoch 12 [4392/4392]    lr: 1.69e-05    img/s: 0.44    loss: 0.0868    psnr: 24.4109
+[2025-04-28 14:12:04,766] INFO - Train - Epoch 13 [1098/4392]    lr: 1.65e-05    img/s: 0.46    loss: 0.0807    psnr: 24.8775
+[2025-04-28 14:12:40,034] INFO - Train - Epoch 13 [2196/4392]    lr: 1.62e-05    img/s: 0.45    loss: 0.0803    psnr: 24.9087
+[2025-04-28 14:13:15,995] INFO - Train - Epoch 13 [3294/4392]    lr: 1.58e-05    img/s: 0.44    loss: 0.0799    psnr: 24.9243
+[2025-04-28 14:13:50,630] INFO - Train - Epoch 13 [4392/4392]    lr: 1.55e-05    img/s: 0.44    loss: 0.0797    psnr: 24.9261
+[2025-04-28 14:14:25,972] INFO - Train - Epoch 14 [1098/4392]    lr: 1.51e-05    img/s: 0.43    loss: 0.0742    psnr: 25.2632
+[2025-04-28 14:15:04,510] INFO - Train - Epoch 14 [2196/4392]    lr: 1.47e-05    img/s: 0.41    loss: 0.0738    psnr: 25.3514
+[2025-04-28 14:15:41,257] INFO - Train - Epoch 14 [3294/4392]    lr: 1.44e-05    img/s: 0.41    loss: 0.0736    psnr: 25.4447
+[2025-04-28 14:16:17,220] INFO - Train - Epoch 14 [4392/4392]    lr: 1.40e-05    img/s: 0.42    loss: 0.0736    psnr: 25.4168
+[2025-04-28 14:16:52,340] INFO - Train - Epoch 15 [1098/4392]    lr: 1.37e-05    img/s: 0.43    loss: 0.0697    psnr: 25.7810
+[2025-04-28 14:17:30,115] INFO - Train - Epoch 15 [2196/4392]    lr: 1.33e-05    img/s: 0.42    loss: 0.0695    psnr: 25.7688
+[2025-04-28 14:18:06,873] INFO - Train - Epoch 15 [3294/4392]    lr: 1.29e-05    img/s: 0.42    loss: 0.0691    psnr: 25.7740
+[2025-04-28 14:18:43,616] INFO - Train - Epoch 15 [4392/4392]    lr: 1.26e-05    img/s: 0.42    loss: 0.0685    psnr: 25.8685
+[2025-04-28 14:19:21,549] INFO - Train - Epoch 16 [1098/4392]    lr: 1.22e-05    img/s: 0.40    loss: 0.0649    psnr: 26.2129
+[2025-04-28 14:19:58,454] INFO - Train - Epoch 16 [2196/4392]    lr: 1.19e-05    img/s: 0.41    loss: 0.0643    psnr: 26.2585
+[2025-04-28 14:20:37,502] INFO - Train - Epoch 16 [3294/4392]    lr: 1.15e-05    img/s: 0.40    loss: 0.0642    psnr: 26.2876
+[2025-04-28 14:21:17,111] INFO - Train - Epoch 16 [4392/4392]    lr: 1.12e-05    img/s: 0.40    loss: 0.0641    psnr: 26.3045
+[2025-04-28 14:21:53,893] INFO - Train - Epoch 17 [1098/4392]    lr: 1.08e-05    img/s: 0.41    loss: 0.0615    psnr: 26.5372
+[2025-04-28 14:22:31,126] INFO - Train - Epoch 17 [2196/4392]    lr: 1.05e-05    img/s: 0.41    loss: 0.0611    psnr: 26.5731
+[2025-04-28 14:23:06,216] INFO - Train - Epoch 17 [3294/4392]    lr: 1.01e-05    img/s: 0.42    loss: 0.0608    psnr: 26.6215
+[2025-04-28 14:23:41,048] INFO - Train - Epoch 17 [4392/4392]    lr: 9.78e-06    img/s: 0.42    loss: 0.0601    psnr: 26.7116
+[2025-04-28 14:24:15,709] INFO - Train - Epoch 18 [1098/4392]    lr: 9.44e-06    img/s: 0.44    loss: 0.0570    psnr: 27.1644
+[2025-04-28 14:24:51,336] INFO - Train - Epoch 18 [2196/4392]    lr: 9.10e-06    img/s: 0.43    loss: 0.0564    psnr: 27.1341
+[2025-04-28 14:25:25,895] INFO - Train - Epoch 18 [3294/4392]    lr: 8.77e-06    img/s: 0.44    loss: 0.0566    psnr: 27.0956
+[2025-04-28 14:26:01,733] INFO - Train - Epoch 18 [4392/4392]    lr: 8.44e-06    img/s: 0.43    loss: 0.0568    psnr: 27.1027
+[2025-04-28 14:26:35,069] INFO - Train - Epoch 19 [1098/4392]    lr: 8.11e-06    img/s: 0.46    loss: 0.0549    psnr: 27.3849
+[2025-04-28 14:27:08,838] INFO - Train - Epoch 19 [2196/4392]    lr: 7.79e-06    img/s: 0.45    loss: 0.0545    psnr: 27.4181
+[2025-04-28 14:27:43,938] INFO - Train - Epoch 19 [3294/4392]    lr: 7.47e-06    img/s: 0.45    loss: 0.0538    psnr: 27.4800
+[2025-04-28 14:28:16,573] INFO - Train - Epoch 19 [4392/4392]    lr: 7.15e-06    img/s: 0.45    loss: 0.0538    psnr: 27.4680
+[2025-04-28 14:28:18,989] INFO - Eval - [15/61]    img/s: 6.21    loss: 0.0546    psnr: 25.5412    ms-ssim: 0.8988
+[2025-04-28 14:28:22,059] INFO - Eval - [30/61]    img/s: 5.47    loss: 0.0529    psnr: 25.7079    ms-ssim: 0.9018
+[2025-04-28 14:28:25,130] INFO - Eval - [45/61]    img/s: 5.26    loss: 0.0525    psnr: 25.7347    ms-ssim: 0.9021
+[2025-04-28 14:28:28,198] INFO - Eval - [60/61]    img/s: 5.16    loss: 0.0528    psnr: 25.7383    ms-ssim: 0.9006
+[2025-04-28 14:28:28,405] INFO - Eval - [61/61]    img/s: 5.16    loss: 0.0529    psnr: 25.7308    ms-ssim: 0.9004
+[2025-04-28 14:28:28,406] INFO - ***        psnr: 25.7308 ms-ssim: 0.9004  @ 2.98M
+[2025-04-28 14:28:28,715] INFO - Saving new best checkpoint: /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/checkpoints/checkpoint_best
+[2025-04-28 14:29:02,364] INFO - Train - Epoch 20 [1098/4392]    lr: 6.84e-06    img/s: 0.45    loss: 0.0515    psnr: 27.8101
+[2025-04-28 14:29:37,737] INFO - Train - Epoch 20 [2196/4392]    lr: 6.54e-06    img/s: 0.44    loss: 0.0518    psnr: 27.7141
+[2025-04-28 14:30:12,597] INFO - Train - Epoch 20 [3294/4392]    lr: 6.24e-06    img/s: 0.44    loss: 0.0518    psnr: 27.7349
+[2025-04-28 14:30:46,916] INFO - Train - Epoch 20 [4392/4392]    lr: 5.95e-06    img/s: 0.44    loss: 0.0514    psnr: 27.7951
+[2025-04-28 14:31:20,473] INFO - Train - Epoch 21 [1098/4392]    lr: 5.66e-06    img/s: 0.45    loss: 0.0491    psnr: 28.0854
+[2025-04-28 14:31:54,199] INFO - Train - Epoch 21 [2196/4392]    lr: 5.37e-06    img/s: 0.45    loss: 0.0495    psnr: 28.0981
+[2025-04-28 14:32:27,716] INFO - Train - Epoch 21 [3294/4392]    lr: 5.10e-06    img/s: 0.45    loss: 0.0493    psnr: 28.0830
+[2025-04-28 14:33:04,196] INFO - Train - Epoch 21 [4392/4392]    lr: 4.83e-06    img/s: 0.44    loss: 0.0492    psnr: 28.1033
+[2025-04-28 14:33:38,903] INFO - Train - Epoch 22 [1098/4392]    lr: 4.56e-06    img/s: 0.44    loss: 0.0469    psnr: 28.3977
+[2025-04-28 14:34:14,432] INFO - Train - Epoch 22 [2196/4392]    lr: 4.31e-06    img/s: 0.43    loss: 0.0473    psnr: 28.3632
+[2025-04-28 14:34:50,656] INFO - Train - Epoch 22 [3294/4392]    lr: 4.05e-06    img/s: 0.43    loss: 0.0477    psnr: 28.3034
+[2025-04-28 14:35:26,648] INFO - Train - Epoch 22 [4392/4392]    lr: 3.81e-06    img/s: 0.43    loss: 0.0475    psnr: 28.3755
+[2025-04-28 14:36:00,272] INFO - Train - Epoch 23 [1098/4392]    lr: 3.57e-06    img/s: 0.45    loss: 0.0453    psnr: 28.7482
+[2025-04-28 14:36:34,669] INFO - Train - Epoch 23 [2196/4392]    lr: 3.34e-06    img/s: 0.45    loss: 0.0457    psnr: 28.6378
+[2025-04-28 14:37:08,858] INFO - Train - Epoch 23 [3294/4392]    lr: 3.12e-06    img/s: 0.45    loss: 0.0460    psnr: 28.6163
+[2025-04-28 14:37:46,103] INFO - Train - Epoch 23 [4392/4392]    lr: 2.90e-06    img/s: 0.44    loss: 0.0460    psnr: 28.6078
+[2025-04-28 14:38:23,798] INFO - Train - Epoch 24 [1098/4392]    lr: 2.70e-06    img/s: 0.40    loss: 0.0445    psnr: 28.9067
+[2025-04-28 14:38:59,755] INFO - Train - Epoch 24 [2196/4392]    lr: 2.50e-06    img/s: 0.41    loss: 0.0448    psnr: 28.8077
+[2025-04-28 14:39:37,609] INFO - Train - Epoch 24 [3294/4392]    lr: 2.30e-06    img/s: 0.41    loss: 0.0449    psnr: 28.7818
+[2025-04-28 14:40:14,015] INFO - Train - Epoch 24 [4392/4392]    lr: 2.12e-06    img/s: 0.41    loss: 0.0448    psnr: 28.8003
+[2025-04-28 14:40:48,570] INFO - Train - Epoch 25 [1098/4392]    lr: 1.94e-06    img/s: 0.44    loss: 0.0440    psnr: 28.9969
+[2025-04-28 14:41:24,098] INFO - Train - Epoch 25 [2196/4392]    lr: 1.78e-06    img/s: 0.44    loss: 0.0441    psnr: 28.9264
+[2025-04-28 14:42:00,946] INFO - Train - Epoch 25 [3294/4392]    lr: 1.62e-06    img/s: 0.43    loss: 0.0438    psnr: 28.9694
+[2025-04-28 14:42:40,427] INFO - Train - Epoch 25 [4392/4392]    lr: 1.47e-06    img/s: 0.42    loss: 0.0439    psnr: 28.9528
+[2025-04-28 14:43:17,137] INFO - Train - Epoch 26 [1098/4392]    lr: 1.32e-06    img/s: 0.42    loss: 0.0422    psnr: 29.2910
+[2025-04-28 14:43:53,969] INFO - Train - Epoch 26 [2196/4392]    lr: 1.19e-06    img/s: 0.41    loss: 0.0433    psnr: 29.0909
+[2025-04-28 14:44:28,048] INFO - Train - Epoch 26 [3294/4392]    lr: 1.07e-06    img/s: 0.43    loss: 0.0436    psnr: 29.0134
+[2025-04-28 14:45:05,237] INFO - Train - Epoch 26 [4392/4392]    lr: 9.51e-07    img/s: 0.42    loss: 0.0433    psnr: 29.0638
+[2025-04-28 14:45:40,615] INFO - Train - Epoch 27 [1098/4392]    lr: 8.44e-07    img/s: 0.43    loss: 0.0421    psnr: 29.0984
+[2025-04-28 14:46:15,180] INFO - Train - Epoch 27 [2196/4392]    lr: 7.46e-07    img/s: 0.44    loss: 0.0425    psnr: 29.0984
+[2025-04-28 14:46:54,671] INFO - Train - Epoch 27 [3294/4392]    lr: 6.58e-07    img/s: 0.42    loss: 0.0425    psnr: 29.1849
+[2025-04-28 14:47:30,145] INFO - Train - Epoch 27 [4392/4392]    lr: 5.78e-07    img/s: 0.42    loss: 0.0428    psnr: 29.1427
+[2025-04-28 14:48:05,049] INFO - Train - Epoch 28 [1098/4392]    lr: 5.08e-07    img/s: 0.44    loss: 0.0419    psnr: 29.3443
+[2025-04-28 14:48:38,143] INFO - Train - Epoch 28 [2196/4392]    lr: 4.47e-07    img/s: 0.45    loss: 0.0422    psnr: 29.2718
+[2025-04-28 14:49:13,458] INFO - Train - Epoch 28 [3294/4392]    lr: 3.95e-07    img/s: 0.44    loss: 0.0425    psnr: 29.2051
+[2025-04-28 14:49:50,080] INFO - Train - Epoch 28 [4392/4392]    lr: 3.53e-07    img/s: 0.44    loss: 0.0425    psnr: 29.1935
+[2025-04-28 14:50:25,425] INFO - Train - Epoch 29 [1098/4392]    lr: 3.20e-07    img/s: 0.43    loss: 0.0423    psnr: 29.3241
+[2025-04-28 14:51:03,765] INFO - Train - Epoch 29 [2196/4392]    lr: 2.97e-07    img/s: 0.41    loss: 0.0425    psnr: 29.1931
+[2025-04-28 14:51:40,562] INFO - Train - Epoch 29 [3294/4392]    lr: 2.82e-07    img/s: 0.41    loss: 0.0421    psnr: 29.2738
+[2025-04-28 14:52:16,861] INFO - Train - Epoch 29 [4392/4392]    lr: 2.78e-07    img/s: 0.42    loss: 0.0424    psnr: 29.2232
+[2025-04-28 14:52:27,543] INFO - Eval - [15/61]    img/s: 1.40    loss: 0.0445    psnr: 26.9461    ms-ssim: 0.9213
+[2025-04-28 14:52:38,148] INFO - Eval - [30/61]    img/s: 1.41    loss: 0.0430    psnr: 27.1220    ms-ssim: 0.9237
+[2025-04-28 14:52:47,547] INFO - Eval - [45/61]    img/s: 1.47    loss: 0.0429    psnr: 27.1349    ms-ssim: 0.9233
+[2025-04-28 14:52:57,399] INFO - Eval - [60/61]    img/s: 1.48    loss: 0.0433    psnr: 27.1290    ms-ssim: 0.9217
+[2025-04-28 14:52:58,065] INFO - Eval - [61/61]    img/s: 1.48    loss: 0.0434    psnr: 27.1165    ms-ssim: 0.9214
+[2025-04-28 14:52:58,519] INFO - ***        psnr: 27.1165 ms-ssim: 0.9214  @ 2.98M
+[2025-04-28 14:52:58,817] INFO - Saving new best checkpoint: /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/checkpoints/checkpoint_best
+[2025-04-28 14:52:58,817] INFO - Start pruning fine-tuning for 30 epochs.
+[2025-04-28 14:52:58,956] INFO - Number of pruned parameters: 447740    total: 2984939
+[2025-04-28 14:52:58,956] INFO - Sparsity: 0.1500
+[2025-04-28 14:53:34,509] INFO - Train (Pruning) - Epoch 0 [1098/4392]    lr: 2.78e-05    img/s: 0.43    loss: 0.0563    psnr: 26.8766
+[2025-04-28 14:54:10,273] INFO - Train (Pruning) - Epoch 0 [2196/4392]    lr: 2.78e-05    img/s: 0.43    loss: 0.0602    psnr: 26.4370
+[2025-04-28 14:54:44,410] INFO - Train (Pruning) - Epoch 0 [3294/4392]    lr: 2.77e-05    img/s: 0.43    loss: 0.0625    psnr: 26.1992
+[2025-04-28 14:55:18,439] INFO - Train (Pruning) - Epoch 0 [4392/4392]    lr: 2.77e-05    img/s: 0.44    loss: 0.0640    psnr: 26.0797
+[2025-04-28 14:55:51,538] INFO - Train (Pruning) - Epoch 1 [1098/4392]    lr: 2.77e-05    img/s: 0.46    loss: 0.0667    psnr: 25.7001
+[2025-04-28 14:56:23,739] INFO - Train (Pruning) - Epoch 1 [2196/4392]    lr: 2.76e-05    img/s: 0.47    loss: 0.0670    psnr: 25.7275
+[2025-04-28 14:56:57,006] INFO - Train (Pruning) - Epoch 1 [3294/4392]    lr: 2.75e-05    img/s: 0.46    loss: 0.0668    psnr: 25.7508
+[2025-04-28 14:57:30,974] INFO - Train (Pruning) - Epoch 1 [4392/4392]    lr: 2.75e-05    img/s: 0.46    loss: 0.0663    psnr: 25.8118
+[2025-04-28 14:58:06,236] INFO - Train (Pruning) - Epoch 2 [1098/4392]    lr: 2.74e-05    img/s: 0.43    loss: 0.0631    psnr: 26.0599
+[2025-04-28 14:58:42,802] INFO - Train (Pruning) - Epoch 2 [2196/4392]    lr: 2.73e-05    img/s: 0.42    loss: 0.0625    psnr: 26.1666
+[2025-04-28 14:59:18,646] INFO - Train (Pruning) - Epoch 2 [3294/4392]    lr: 2.72e-05    img/s: 0.42    loss: 0.0620    psnr: 26.2279
+[2025-04-28 14:59:54,053] INFO - Train (Pruning) - Epoch 2 [4392/4392]    lr: 2.71e-05    img/s: 0.43    loss: 0.0616    psnr: 26.2817
+[2025-04-28 15:00:29,555] INFO - Train (Pruning) - Epoch 3 [1098/4392]    lr: 2.70e-05    img/s: 0.43    loss: 0.0581    psnr: 26.6622
+[2025-04-28 15:01:04,217] INFO - Train (Pruning) - Epoch 3 [2196/4392]    lr: 2.69e-05    img/s: 0.43    loss: 0.0590    psnr: 26.5492
+[2025-04-28 15:01:37,468] INFO - Train (Pruning) - Epoch 3 [3294/4392]    lr: 2.67e-05    img/s: 0.44    loss: 0.0586    psnr: 26.6263
+[2025-04-28 15:02:12,672] INFO - Train (Pruning) - Epoch 3 [4392/4392]    lr: 2.66e-05    img/s: 0.44    loss: 0.0581    psnr: 26.6662
+[2025-04-28 15:02:49,083] INFO - Train (Pruning) - Epoch 4 [1098/4392]    lr: 2.64e-05    img/s: 0.42    loss: 0.0554    psnr: 27.0201
+[2025-04-28 15:03:28,362] INFO - Train (Pruning) - Epoch 4 [2196/4392]    lr: 2.63e-05    img/s: 0.40    loss: 0.0556    psnr: 26.9686
+[2025-04-28 15:04:04,327] INFO - Train (Pruning) - Epoch 4 [3294/4392]    lr: 2.61e-05    img/s: 0.41    loss: 0.0548    psnr: 27.0646
+[2025-04-28 15:04:40,600] INFO - Train (Pruning) - Epoch 4 [4392/4392]    lr: 2.59e-05    img/s: 0.41    loss: 0.0547    psnr: 27.0605
+[2025-04-28 15:05:14,333] INFO - Train (Pruning) - Epoch 5 [1098/4392]    lr: 2.58e-05    img/s: 0.45    loss: 0.0534    psnr: 27.2323
+[2025-04-28 15:05:49,768] INFO - Train (Pruning) - Epoch 5 [2196/4392]    lr: 2.56e-05    img/s: 0.44    loss: 0.0533    psnr: 27.2057
+[2025-04-28 15:06:25,905] INFO - Train (Pruning) - Epoch 5 [3294/4392]    lr: 2.54e-05    img/s: 0.43    loss: 0.0522    psnr: 27.3629
+[2025-04-28 15:07:01,301] INFO - Train (Pruning) - Epoch 5 [4392/4392]    lr: 2.52e-05    img/s: 0.43    loss: 0.0519    psnr: 27.4291
+[2025-04-28 15:07:39,041] INFO - Train (Pruning) - Epoch 6 [1098/4392]    lr: 2.49e-05    img/s: 0.40    loss: 0.0489    psnr: 27.6916
+[2025-04-28 15:08:13,651] INFO - Train (Pruning) - Epoch 6 [2196/4392]    lr: 2.47e-05    img/s: 0.42    loss: 0.0490    psnr: 27.7369
+[2025-04-28 15:08:50,598] INFO - Train (Pruning) - Epoch 6 [3294/4392]    lr: 2.45e-05    img/s: 0.42    loss: 0.0492    psnr: 27.7420
+[2025-04-28 15:09:24,681] INFO - Train (Pruning) - Epoch 6 [4392/4392]    lr: 2.42e-05    img/s: 0.43    loss: 0.0492    psnr: 27.7897
+[2025-04-28 15:10:02,175] INFO - Train (Pruning) - Epoch 7 [1098/4392]    lr: 2.40e-05    img/s: 0.41    loss: 0.0467    psnr: 28.1374
+[2025-04-28 15:10:38,370] INFO - Train (Pruning) - Epoch 7 [2196/4392]    lr: 2.38e-05    img/s: 0.41    loss: 0.0469    psnr: 28.0904
+[2025-04-28 15:11:13,695] INFO - Train (Pruning) - Epoch 7 [3294/4392]    lr: 2.35e-05    img/s: 0.42    loss: 0.0467    psnr: 28.1311
+[2025-04-28 15:11:47,221] INFO - Train (Pruning) - Epoch 7 [4392/4392]    lr: 2.32e-05    img/s: 0.43    loss: 0.0467    psnr: 28.1433
+[2025-04-28 15:12:23,577] INFO - Train (Pruning) - Epoch 8 [1098/4392]    lr: 2.30e-05    img/s: 0.42    loss: 0.0447    psnr: 28.3607
+[2025-04-28 15:12:58,341] INFO - Train (Pruning) - Epoch 8 [2196/4392]    lr: 2.27e-05    img/s: 0.43    loss: 0.0449    psnr: 28.3937
+[2025-04-28 15:13:31,693] INFO - Train (Pruning) - Epoch 8 [3294/4392]    lr: 2.24e-05    img/s: 0.44    loss: 0.0446    psnr: 28.4686
+[2025-04-28 15:14:06,414] INFO - Train (Pruning) - Epoch 8 [4392/4392]    lr: 2.21e-05    img/s: 0.44    loss: 0.0444    psnr: 28.5030
+[2025-04-28 15:14:42,580] INFO - Train (Pruning) - Epoch 9 [1098/4392]    lr: 2.18e-05    img/s: 0.42    loss: 0.0429    psnr: 28.7426
+[2025-04-28 15:15:19,236] INFO - Train (Pruning) - Epoch 9 [2196/4392]    lr: 2.15e-05    img/s: 0.42    loss: 0.0427    psnr: 28.7838
+[2025-04-28 15:15:57,120] INFO - Train (Pruning) - Epoch 9 [3294/4392]    lr: 2.12e-05    img/s: 0.41    loss: 0.0426    psnr: 28.7754
+[2025-04-28 15:16:35,876] INFO - Train (Pruning) - Epoch 9 [4392/4392]    lr: 2.09e-05    img/s: 0.41    loss: 0.0423    psnr: 28.8269
+[2025-04-28 15:16:39,550] INFO - Eval (Pruning) - [15/61]    img/s: 4.08    loss: 0.0426    psnr: 26.8484    ms-ssim: 0.9268
+[2025-04-28 15:16:41,656] INFO - Eval (Pruning) - [30/61]    img/s: 5.19    loss: 0.0413    psnr: 27.0219    ms-ssim: 0.9292
+[2025-04-28 15:16:44,795] INFO - Eval (Pruning) - [45/61]    img/s: 5.05    loss: 0.0413    psnr: 27.0209    ms-ssim: 0.9287
+[2025-04-28 15:16:47,938] INFO - Eval (Pruning) - [60/61]    img/s: 4.97    loss: 0.0418    psnr: 27.0077    ms-ssim: 0.9269
+[2025-04-28 15:16:48,146] INFO - Eval (Pruning) - [61/61]    img/s: 4.97    loss: 0.0419    psnr: 26.9932    ms-ssim: 0.9266
+[2025-04-28 15:16:48,147] INFO - ***        psnr: 26.9932 ms-ssim: 0.9266  @ 2.98M
+[2025-04-28 15:17:26,160] INFO - Train (Pruning) - Epoch 10 [1098/4392]    lr: 2.06e-05    img/s: 0.40    loss: 0.0412    psnr: 29.0366
+[2025-04-28 15:18:01,635] INFO - Train (Pruning) - Epoch 10 [2196/4392]    lr: 2.03e-05    img/s: 0.42    loss: 0.0410    psnr: 29.0538
+[2025-04-28 15:24:59,339] INFO - Train (Pruning) - Epoch 10 [3294/4392]    lr: 1.99e-05    img/s: 0.09    loss: 0.0407    psnr: 29.1136
+[2025-04-28 15:25:31,970] INFO - Train (Pruning) - Epoch 10 [4392/4392]    lr: 1.96e-05    img/s: 0.12    loss: 0.0404    psnr: 29.1533
+[2025-04-28 15:26:06,963] INFO - Train (Pruning) - Epoch 11 [1098/4392]    lr: 1.93e-05    img/s: 0.44    loss: 0.0397    psnr: 29.2779
+[2025-04-28 15:26:39,137] INFO - Train (Pruning) - Epoch 11 [2196/4392]    lr: 1.90e-05    img/s: 0.45    loss: 0.0394    psnr: 29.3469
+[2025-04-28 15:27:13,974] INFO - Train (Pruning) - Epoch 11 [3294/4392]    lr: 1.86e-05    img/s: 0.45    loss: 0.0391    psnr: 29.3969
+[2025-04-28 15:27:49,922] INFO - Train (Pruning) - Epoch 11 [4392/4392]    lr: 1.83e-05    img/s: 0.44    loss: 0.0388    psnr: 29.4516
+[2025-04-28 15:28:24,026] INFO - Train (Pruning) - Epoch 12 [1098/4392]    lr: 1.79e-05    img/s: 0.45    loss: 0.0375    psnr: 29.6868
+[2025-04-28 15:28:56,026] INFO - Train (Pruning) - Epoch 12 [2196/4392]    lr: 1.76e-05    img/s: 0.46    loss: 0.0375    psnr: 29.6992
+[2025-04-28 15:29:29,019] INFO - Train (Pruning) - Epoch 12 [3294/4392]    lr: 1.72e-05    img/s: 0.46    loss: 0.0373    psnr: 29.7291
+[2025-04-28 15:30:00,526] INFO - Train (Pruning) - Epoch 12 [4392/4392]    lr: 1.69e-05    img/s: 0.47    loss: 0.0372    psnr: 29.7625
+[2025-04-28 15:30:32,842] INFO - Train (Pruning) - Epoch 13 [1098/4392]    lr: 1.65e-05    img/s: 0.47    loss: 0.0361    psnr: 29.9789
+[2025-04-28 15:31:11,004] INFO - Train (Pruning) - Epoch 13 [2196/4392]    lr: 1.62e-05    img/s: 0.43    loss: 0.0361    psnr: 29.9822
+[2025-04-28 15:31:46,632] INFO - Train (Pruning) - Epoch 13 [3294/4392]    lr: 1.58e-05    img/s: 0.43    loss: 0.0360    psnr: 29.9920
+[2025-04-28 15:32:21,964] INFO - Train (Pruning) - Epoch 13 [4392/4392]    lr: 1.55e-05    img/s: 0.43    loss: 0.0357    psnr: 30.0419
+[2025-04-28 15:32:55,216] INFO - Train (Pruning) - Epoch 14 [1098/4392]    lr: 1.51e-05    img/s: 0.46    loss: 0.0341    psnr: 30.3356
+[2025-04-28 15:33:27,584] INFO - Train (Pruning) - Epoch 14 [2196/4392]    lr: 1.47e-05    img/s: 0.46    loss: 0.0339    psnr: 30.3886
+[2025-04-28 15:33:59,249] INFO - Train (Pruning) - Epoch 14 [3294/4392]    lr: 1.44e-05    img/s: 0.47    loss: 0.0341    psnr: 30.3647
+[2025-04-28 15:34:33,180] INFO - Train (Pruning) - Epoch 14 [4392/4392]    lr: 1.40e-05    img/s: 0.46    loss: 0.0344    psnr: 30.3249
+[2025-04-28 15:35:07,618] INFO - Train (Pruning) - Epoch 15 [1098/4392]    lr: 1.37e-05    img/s: 0.44    loss: 0.0334    psnr: 30.5778
+[2025-04-28 15:35:38,260] INFO - Train (Pruning) - Epoch 15 [2196/4392]    lr: 1.33e-05    img/s: 0.47    loss: 0.0332    psnr: 30.5498
+[2025-04-28 15:36:09,462] INFO - Train (Pruning) - Epoch 15 [3294/4392]    lr: 1.29e-05    img/s: 0.48    loss: 0.0332    psnr: 30.5669
+[2025-04-28 15:36:40,696] INFO - Train (Pruning) - Epoch 15 [4392/4392]    lr: 1.26e-05    img/s: 0.48    loss: 0.0332    psnr: 30.5976
+[2025-04-28 15:37:12,607] INFO - Train (Pruning) - Epoch 16 [1098/4392]    lr: 1.22e-05    img/s: 0.48    loss: 0.0323    psnr: 30.7476
+[2025-04-28 15:37:44,091] INFO - Train (Pruning) - Epoch 16 [2196/4392]    lr: 1.19e-05    img/s: 0.48    loss: 0.0320    psnr: 30.7940
+[2025-04-28 15:38:15,519] INFO - Train (Pruning) - Epoch 16 [3294/4392]    lr: 1.15e-05    img/s: 0.48    loss: 0.0321    psnr: 30.8034
+[2025-04-28 15:38:46,135] INFO - Train (Pruning) - Epoch 16 [4392/4392]    lr: 1.12e-05    img/s: 0.49    loss: 0.0321    psnr: 30.8491
+[2025-04-28 15:39:17,410] INFO - Train (Pruning) - Epoch 17 [1098/4392]    lr: 1.08e-05    img/s: 0.49    loss: 0.0309    psnr: 31.1525
+[2025-04-28 15:39:54,341] INFO - Train (Pruning) - Epoch 17 [2196/4392]    lr: 1.05e-05    img/s: 0.45    loss: 0.0314    psnr: 31.0552
+[2025-04-28 15:40:30,070] INFO - Train (Pruning) - Epoch 17 [3294/4392]    lr: 1.01e-05    img/s: 0.44    loss: 0.0311    psnr: 31.1000
+[2025-04-28 15:41:03,325] INFO - Train (Pruning) - Epoch 17 [4392/4392]    lr: 9.78e-06    img/s: 0.44    loss: 0.0310    psnr: 31.1044
+[2025-04-28 15:41:38,960] INFO - Train (Pruning) - Epoch 18 [1098/4392]    lr: 9.44e-06    img/s: 0.43    loss: 0.0300    psnr: 31.3558
+[2025-04-28 15:42:13,625] INFO - Train (Pruning) - Epoch 18 [2196/4392]    lr: 9.10e-06    img/s: 0.43    loss: 0.0305    psnr: 31.2527
+[2025-04-28 15:42:44,569] INFO - Train (Pruning) - Epoch 18 [3294/4392]    lr: 8.77e-06    img/s: 0.45    loss: 0.0304    psnr: 31.2866
+[2025-04-28 15:43:21,304] INFO - Train (Pruning) - Epoch 18 [4392/4392]    lr: 8.44e-06    img/s: 0.44    loss: 0.0302    psnr: 31.3158
+[2025-04-28 15:43:55,500] INFO - Train (Pruning) - Epoch 19 [1098/4392]    lr: 8.11e-06    img/s: 0.45    loss: 0.0297    psnr: 31.3970
+[2025-04-28 15:44:25,691] INFO - Train (Pruning) - Epoch 19 [2196/4392]    lr: 7.79e-06    img/s: 0.47    loss: 0.0296    psnr: 31.5074
+[2025-04-28 15:44:57,565] INFO - Train (Pruning) - Epoch 19 [3294/4392]    lr: 7.47e-06    img/s: 0.48    loss: 0.0295    psnr: 31.5067
+[2025-04-28 15:45:30,223] INFO - Train (Pruning) - Epoch 19 [4392/4392]    lr: 7.15e-06    img/s: 0.47    loss: 0.0293    psnr: 31.5345
+[2025-04-28 15:45:33,857] INFO - Eval (Pruning) - [15/61]    img/s: 4.13    loss: 0.0295    psnr: 29.5898    ms-ssim: 0.9541
+[2025-04-28 15:45:36,960] INFO - Eval (Pruning) - [30/61]    img/s: 4.45    loss: 0.0285    psnr: 29.7734    ms-ssim: 0.9554
+[2025-04-28 15:45:40,035] INFO - Eval (Pruning) - [45/61]    img/s: 4.59    loss: 0.0286    psnr: 29.7466    ms-ssim: 0.9546
+[2025-04-28 15:45:42,396] INFO - Eval (Pruning) - [60/61]    img/s: 4.93    loss: 0.0291    psnr: 29.7125    ms-ssim: 0.9531
+[2025-04-28 15:45:42,601] INFO - Eval (Pruning) - [61/61]    img/s: 4.93    loss: 0.0292    psnr: 29.6953    ms-ssim: 0.9529
+[2025-04-28 15:45:42,602] INFO - ***        psnr: 29.6953 ms-ssim: 0.9529  @ 2.98M
+[2025-04-28 15:45:42,983] INFO - Saving new best checkpoint: /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/checkpoints/checkpoint_best
+[2025-04-28 15:46:15,591] INFO - Train (Pruning) - Epoch 20 [1098/4392]    lr: 6.84e-06    img/s: 0.47    loss: 0.0287    psnr: 31.7558
+[2025-04-28 15:46:46,521] INFO - Train (Pruning) - Epoch 20 [2196/4392]    lr: 6.54e-06    img/s: 0.48    loss: 0.0288    psnr: 31.6498
+[2025-04-28 15:47:19,107] INFO - Train (Pruning) - Epoch 20 [3294/4392]    lr: 6.24e-06    img/s: 0.48    loss: 0.0287    psnr: 31.6733
+[2025-04-28 15:47:50,090] INFO - Train (Pruning) - Epoch 20 [4392/4392]    lr: 5.95e-06    img/s: 0.48    loss: 0.0286    psnr: 31.7267
+[2025-04-28 15:48:22,739] INFO - Train (Pruning) - Epoch 21 [1098/4392]    lr: 5.66e-06    img/s: 0.47    loss: 0.0278    psnr: 31.9479
+[2025-04-28 15:48:55,283] INFO - Train (Pruning) - Epoch 21 [2196/4392]    lr: 5.37e-06    img/s: 0.47    loss: 0.0281    psnr: 31.8740
+[2025-04-28 15:49:28,833] INFO - Train (Pruning) - Epoch 21 [3294/4392]    lr: 5.10e-06    img/s: 0.46    loss: 0.0281    psnr: 31.8498
+[2025-04-28 15:50:02,957] INFO - Train (Pruning) - Epoch 21 [4392/4392]    lr: 4.83e-06    img/s: 0.46    loss: 0.0280    psnr: 31.8967
+[2025-04-28 15:50:34,003] INFO - Train (Pruning) - Epoch 22 [1098/4392]    lr: 4.56e-06    img/s: 0.49    loss: 0.0277    psnr: 31.9880
+[2025-04-28 15:51:04,882] INFO - Train (Pruning) - Epoch 22 [2196/4392]    lr: 4.31e-06    img/s: 0.49    loss: 0.0274    psnr: 32.0393
+[2025-04-28 15:51:35,738] INFO - Train (Pruning) - Epoch 22 [3294/4392]    lr: 4.05e-06    img/s: 0.49    loss: 0.0274    psnr: 32.0546
+[2025-04-28 15:52:06,857] INFO - Train (Pruning) - Epoch 22 [4392/4392]    lr: 3.81e-06    img/s: 0.49    loss: 0.0275    psnr: 32.0447
+[2025-04-28 15:52:39,232] INFO - Train (Pruning) - Epoch 23 [1098/4392]    lr: 3.57e-06    img/s: 0.47    loss: 0.0274    psnr: 32.0958
+[2025-04-28 15:53:19,601] INFO - Train (Pruning) - Epoch 23 [2196/4392]    lr: 3.34e-06    img/s: 0.42    loss: 0.0270    psnr: 32.1902
+[2025-04-28 15:53:52,430] INFO - Train (Pruning) - Epoch 23 [3294/4392]    lr: 3.12e-06    img/s: 0.43    loss: 0.0270    psnr: 32.1762
+[2025-04-28 15:54:25,743] INFO - Train (Pruning) - Epoch 23 [4392/4392]    lr: 2.90e-06    img/s: 0.44    loss: 0.0271    psnr: 32.1663
+[2025-04-28 15:54:57,596] INFO - Train (Pruning) - Epoch 24 [1098/4392]    lr: 2.70e-06    img/s: 0.48    loss: 0.0262    psnr: 32.3341
+[2025-04-28 15:55:28,445] INFO - Train (Pruning) - Epoch 24 [2196/4392]    lr: 2.50e-06    img/s: 0.49    loss: 0.0264    psnr: 32.3340
+[2025-04-28 15:56:01,060] INFO - Train (Pruning) - Epoch 24 [3294/4392]    lr: 2.30e-06    img/s: 0.48    loss: 0.0266    psnr: 32.3069
+[2025-04-28 15:56:33,752] INFO - Train (Pruning) - Epoch 24 [4392/4392]    lr: 2.12e-06    img/s: 0.48    loss: 0.0267    psnr: 32.2646
+[2025-04-28 15:57:05,598] INFO - Train (Pruning) - Epoch 25 [1098/4392]    lr: 1.94e-06    img/s: 0.48    loss: 0.0261    psnr: 32.4058
+[2025-04-28 15:57:37,938] INFO - Train (Pruning) - Epoch 25 [2196/4392]    lr: 1.78e-06    img/s: 0.48    loss: 0.0263    psnr: 32.3743
+[2025-04-28 15:58:11,075] INFO - Train (Pruning) - Epoch 25 [3294/4392]    lr: 1.62e-06    img/s: 0.47    loss: 0.0265    psnr: 32.3338
+[2025-04-28 15:58:44,163] INFO - Train (Pruning) - Epoch 25 [4392/4392]    lr: 1.47e-06    img/s: 0.47    loss: 0.0264    psnr: 32.3393
+[2025-04-28 15:59:16,009] INFO - Train (Pruning) - Epoch 26 [1098/4392]    lr: 1.32e-06    img/s: 0.48    loss: 0.0265    psnr: 32.3073
+[2025-04-28 15:59:47,303] INFO - Train (Pruning) - Epoch 26 [2196/4392]    lr: 1.19e-06    img/s: 0.48    loss: 0.0263    psnr: 32.3863
+[2025-04-28 16:00:21,066] INFO - Train (Pruning) - Epoch 26 [3294/4392]    lr: 1.07e-06    img/s: 0.47    loss: 0.0262    psnr: 32.4125
+[2025-04-28 16:00:53,539] INFO - Train (Pruning) - Epoch 26 [4392/4392]    lr: 9.51e-07    img/s: 0.47    loss: 0.0262    psnr: 32.3948
+[2025-04-28 16:01:27,014] INFO - Train (Pruning) - Epoch 27 [1098/4392]    lr: 8.44e-07    img/s: 0.46    loss: 0.0261    psnr: 32.5033
+[2025-04-28 16:01:59,139] INFO - Train (Pruning) - Epoch 27 [2196/4392]    lr: 7.46e-07    img/s: 0.46    loss: 0.0262    psnr: 32.4629
+[2025-04-28 16:02:31,498] INFO - Train (Pruning) - Epoch 27 [3294/4392]    lr: 6.58e-07    img/s: 0.47    loss: 0.0262    psnr: 32.4359
+[2025-04-28 16:03:07,077] INFO - Train (Pruning) - Epoch 27 [4392/4392]    lr: 5.78e-07    img/s: 0.46    loss: 0.0261    psnr: 32.4332
+[2025-04-28 16:03:37,146] INFO - Train (Pruning) - Epoch 28 [1098/4392]    lr: 5.08e-07    img/s: 0.51    loss: 0.0259    psnr: 32.4742
+[2025-04-28 16:04:10,099] INFO - Train (Pruning) - Epoch 28 [2196/4392]    lr: 4.47e-07    img/s: 0.48    loss: 0.0257    psnr: 32.5392
+[2025-04-28 16:04:44,705] INFO - Train (Pruning) - Epoch 28 [3294/4392]    lr: 3.95e-07    img/s: 0.47    loss: 0.0259    psnr: 32.4787
+[2025-04-28 16:05:17,025] INFO - Train (Pruning) - Epoch 28 [4392/4392]    lr: 3.53e-07    img/s: 0.47    loss: 0.0260    psnr: 32.4583
+[2025-04-28 16:16:10,237] INFO - Train (Pruning) - Epoch 29 [1098/4392]    lr: 3.20e-07    img/s: 0.02    loss: 0.0260    psnr: 32.4638
+[2025-04-28 16:16:44,248] INFO - Train (Pruning) - Epoch 29 [2196/4392]    lr: 2.97e-07    img/s: 0.04    loss: 0.0257    psnr: 32.5343
+[2025-04-28 16:17:20,591] INFO - Train (Pruning) - Epoch 29 [3294/4392]    lr: 2.82e-07    img/s: 0.06    loss: 0.0259    psnr: 32.4846
+[2025-04-28 16:17:53,886] INFO - Train (Pruning) - Epoch 29 [4392/4392]    lr: 2.78e-07    img/s: 0.08    loss: 0.0259    psnr: 32.4731
+[2025-04-28 16:18:04,144] INFO - Eval (Pruning) - [15/61]    img/s: 1.46    loss: 0.0267    psnr: 30.3496    ms-ssim: 0.9594
+[2025-04-28 16:18:13,600] INFO - Eval (Pruning) - [30/61]    img/s: 1.52    loss: 0.0258    psnr: 30.5638    ms-ssim: 0.9606
+[2025-04-28 16:18:23,685] INFO - Eval (Pruning) - [45/61]    img/s: 1.51    loss: 0.0260    psnr: 30.5283    ms-ssim: 0.9598
+[2025-04-28 16:18:33,641] INFO - Eval (Pruning) - [60/61]    img/s: 1.51    loss: 0.0264    psnr: 30.4961    ms-ssim: 0.9585
+[2025-04-28 16:18:34,311] INFO - Eval (Pruning) - [61/61]    img/s: 1.51    loss: 0.0265    psnr: 30.4777    ms-ssim: 0.9583
+[2025-04-28 16:18:34,773] INFO - ***        psnr: 30.4777 ms-ssim: 0.9583  @ 2.98M
+[2025-04-28 16:18:35,129] INFO - Saving new best checkpoint: /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/checkpoints/checkpoint_best
+[2025-04-28 16:18:35,129] INFO - Start quant fine-tuning for 30 epochs.
+[2025-04-28 16:18:35,129] INFO - Quantization level: [8, 7, 6]
+[2025-04-28 16:18:35,129] INFO - Quantization noise: 0.9
+[2025-04-28 16:19:10,023] INFO - Train (QAT) - Epoch 0 [1098/4392]    lr: 2.78e-06    img/s: 0.44    loss: 0.0261    psnr: 32.3799
+[2025-04-28 16:19:45,074] INFO - Train (QAT) - Epoch 0 [2196/4392]    lr: 2.78e-06    img/s: 0.44    loss: 0.0269    psnr: 32.1998
+[2025-04-28 16:20:18,603] INFO - Train (QAT) - Epoch 0 [3294/4392]    lr: 2.77e-06    img/s: 0.44    loss: 0.0267    psnr: 32.2447
+[2025-04-28 16:20:55,263] INFO - Train (QAT) - Epoch 0 [4392/4392]    lr: 2.77e-06    img/s: 0.44    loss: 0.0268    psnr: 32.2159
+[2025-04-28 16:21:31,460] INFO - Train (QAT) - Epoch 1 [1098/4392]    lr: 2.77e-06    img/s: 0.42    loss: 0.0262    psnr: 32.3387
+[2025-04-28 16:22:05,973] INFO - Train (QAT) - Epoch 1 [2196/4392]    lr: 2.76e-06    img/s: 0.43    loss: 0.0266    psnr: 32.2556
+[2025-04-28 16:22:41,145] INFO - Train (QAT) - Epoch 1 [3294/4392]    lr: 2.75e-06    img/s: 0.43    loss: 0.0265    psnr: 32.2836
+[2025-04-28 16:23:16,477] INFO - Train (QAT) - Epoch 1 [4392/4392]    lr: 2.75e-06    img/s: 0.43    loss: 0.0265    psnr: 32.2904
+[2025-04-28 16:23:52,600] INFO - Train (QAT) - Epoch 2 [1098/4392]    lr: 2.74e-06    img/s: 0.42    loss: 0.0263    psnr: 32.4034
+[2025-04-28 16:24:33,551] INFO - Train (QAT) - Epoch 2 [2196/4392]    lr: 2.73e-06    img/s: 0.40    loss: 0.0262    psnr: 32.3182
+[2025-04-28 16:25:09,050] INFO - Train (QAT) - Epoch 2 [3294/4392]    lr: 2.72e-06    img/s: 0.41    loss: 0.0265    psnr: 32.2979
+[2025-04-28 16:25:44,299] INFO - Train (QAT) - Epoch 2 [4392/4392]    lr: 2.71e-06    img/s: 0.41    loss: 0.0264    psnr: 32.3126
+[2025-04-28 16:26:21,241] INFO - Train (QAT) - Epoch 3 [1098/4392]    lr: 2.70e-06    img/s: 0.41    loss: 0.0266    psnr: 32.3241
+[2025-04-28 16:26:56,773] INFO - Train (QAT) - Epoch 3 [2196/4392]    lr: 2.69e-06    img/s: 0.42    loss: 0.0265    psnr: 32.3322
+[2025-04-28 16:27:34,185] INFO - Train (QAT) - Epoch 3 [3294/4392]    lr: 2.67e-06    img/s: 0.42    loss: 0.0265    psnr: 32.3177
+[2025-04-28 16:28:09,963] INFO - Train (QAT) - Epoch 3 [4392/4392]    lr: 2.66e-06    img/s: 0.42    loss: 0.0264    psnr: 32.3263
+[2025-04-28 16:28:45,762] INFO - Train (QAT) - Epoch 4 [1098/4392]    lr: 2.64e-06    img/s: 0.43    loss: 0.0263    psnr: 32.3046
+[2025-04-28 16:29:22,539] INFO - Train (QAT) - Epoch 4 [2196/4392]    lr: 2.63e-06    img/s: 0.42    loss: 0.0261    psnr: 32.3985
+[2025-04-28 16:29:59,139] INFO - Train (QAT) - Epoch 4 [3294/4392]    lr: 2.61e-06    img/s: 0.42    loss: 0.0261    psnr: 32.4022
+[2025-04-28 16:30:35,793] INFO - Train (QAT) - Epoch 4 [4392/4392]    lr: 2.59e-06    img/s: 0.42    loss: 0.0264    psnr: 32.3388
+[2025-04-28 16:31:11,632] INFO - Train (QAT) - Epoch 5 [1098/4392]    lr: 2.58e-06    img/s: 0.43    loss: 0.0264    psnr: 32.2654
+[2025-04-28 16:31:47,118] INFO - Train (QAT) - Epoch 5 [2196/4392]    lr: 2.56e-06    img/s: 0.43    loss: 0.0262    psnr: 32.3348
+[2025-04-28 16:32:23,082] INFO - Train (QAT) - Epoch 5 [3294/4392]    lr: 2.54e-06    img/s: 0.43    loss: 0.0262    psnr: 32.3604
+[2025-04-28 16:32:57,887] INFO - Train (QAT) - Epoch 5 [4392/4392]    lr: 2.52e-06    img/s: 0.43    loss: 0.0263    psnr: 32.3506
+[2025-04-28 16:33:32,948] INFO - Train (QAT) - Epoch 6 [1098/4392]    lr: 2.49e-06    img/s: 0.43    loss: 0.0259    psnr: 32.4157
+[2025-04-28 16:34:08,638] INFO - Train (QAT) - Epoch 6 [2196/4392]    lr: 2.47e-06    img/s: 0.43    loss: 0.0260    psnr: 32.4188
+[2025-04-28 16:34:44,161] INFO - Train (QAT) - Epoch 6 [3294/4392]    lr: 2.45e-06    img/s: 0.43    loss: 0.0262    psnr: 32.3668
+[2025-04-28 16:35:20,172] INFO - Train (QAT) - Epoch 6 [4392/4392]    lr: 2.42e-06    img/s: 0.43    loss: 0.0263    psnr: 32.3594
+[2025-04-28 16:35:57,005] INFO - Train (QAT) - Epoch 7 [1098/4392]    lr: 2.40e-06    img/s: 0.41    loss: 0.0262    psnr: 32.4480
+[2025-04-28 16:36:32,070] INFO - Train (QAT) - Epoch 7 [2196/4392]    lr: 2.38e-06    img/s: 0.42    loss: 0.0263    psnr: 32.3712
+[2025-04-28 16:37:08,295] INFO - Train (QAT) - Epoch 7 [3294/4392]    lr: 2.35e-06    img/s: 0.42    loss: 0.0263    psnr: 32.3788
+[2025-04-28 16:37:44,800] INFO - Train (QAT) - Epoch 7 [4392/4392]    lr: 2.32e-06    img/s: 0.42    loss: 0.0262    psnr: 32.3688
+[2025-04-28 16:38:21,191] INFO - Train (QAT) - Epoch 8 [1098/4392]    lr: 2.30e-06    img/s: 0.42    loss: 0.0256    psnr: 32.5077
+[2025-04-28 16:38:57,316] INFO - Train (QAT) - Epoch 8 [2196/4392]    lr: 2.27e-06    img/s: 0.42    loss: 0.0261    psnr: 32.3927
+[2025-04-28 16:39:33,719] INFO - Train (QAT) - Epoch 8 [3294/4392]    lr: 2.24e-06    img/s: 0.42    loss: 0.0262    psnr: 32.3815
+[2025-04-28 16:40:09,140] INFO - Train (QAT) - Epoch 8 [4392/4392]    lr: 2.21e-06    img/s: 0.42    loss: 0.0262    psnr: 32.3797
+[2025-04-28 16:40:44,062] INFO - Train (QAT) - Epoch 9 [1098/4392]    lr: 2.18e-06    img/s: 0.44    loss: 0.0263    psnr: 32.3803
+[2025-04-28 16:41:21,133] INFO - Train (QAT) - Epoch 9 [2196/4392]    lr: 2.15e-06    img/s: 0.42    loss: 0.0262    psnr: 32.3795
+[2025-04-28 16:41:57,988] INFO - Train (QAT) - Epoch 9 [3294/4392]    lr: 2.12e-06    img/s: 0.42    loss: 0.0261    psnr: 32.3890
+[2025-04-28 16:42:35,779] INFO - Train (QAT) - Epoch 9 [4392/4392]    lr: 2.09e-06    img/s: 0.42    loss: 0.0262    psnr: 32.3901
+[2025-04-28 16:42:35,804] INFO - Compress model weights into bitstream
+[2025-04-28 16:42:35,804] INFO - ***  Quant level: 8bits
+[2025-04-28 16:42:35,804] INFO - ***  Sparsity: 0.1500
+[2025-04-28 16:42:47,594] INFO - Model bitstream saved in /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/bitstreams/Q8.zip
+[2025-04-28 16:42:47,603] INFO - Compressed model size: 2.68MB
+[2025-04-28 16:42:47,603] INFO - Bits Per Pixel (BPP): 0.1697
+[2025-04-28 16:42:47,610] INFO - Decompress model weights from bitstream
+[2025-04-28 16:42:51,263] INFO - Model restored from /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/bitstreams/Q8.zip
+[2025-04-28 16:42:54,808] INFO - Eval (Q8) - [15/61]    img/s: 4.26    loss: 0.0273    psnr: 30.1791    ms-ssim: 0.9585
+[2025-04-28 16:42:57,888] INFO - Eval (Q8) - [30/61]    img/s: 4.54    loss: 0.0264    psnr: 30.3818    ms-ssim: 0.9597
+[2025-04-28 16:43:00,951] INFO - Eval (Q8) - [45/61]    img/s: 4.65    loss: 0.0265    psnr: 30.3482    ms-ssim: 0.9589
+[2025-04-28 16:43:04,008] INFO - Eval (Q8) - [60/61]    img/s: 4.71    loss: 0.0269    psnr: 30.3179    ms-ssim: 0.9576
+[2025-04-28 16:43:04,211] INFO - Eval (Q8) - [61/61]    img/s: 4.72    loss: 0.0270    psnr: 30.2999    ms-ssim: 0.9574
+[2025-04-28 16:43:04,212] INFO - ***        psnr: 30.2999 ms-ssim: 0.9574  @ 0.1697bpp
+[2025-04-28 16:43:04,229] INFO - Compress model weights into bitstream
+[2025-04-28 16:43:04,229] INFO - ***  Quant level: 7bits
+[2025-04-28 16:43:04,229] INFO - ***  Sparsity: 0.1500
+[2025-04-28 16:43:08,126] INFO - Model bitstream saved in /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/bitstreams/Q7.zip
+[2025-04-28 16:43:08,134] INFO - Compressed model size: 2.35MB
+[2025-04-28 16:43:08,134] INFO - Bits Per Pixel (BPP): 0.1484
+[2025-04-28 16:43:08,137] INFO - Decompress model weights from bitstream
+[2025-04-28 16:43:10,040] INFO - Model restored from /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/bitstreams/Q7.zip
+[2025-04-28 16:43:13,467] INFO - Eval (Q7) - [15/61]    img/s: 4.38    loss: 0.0277    psnr: 30.1004    ms-ssim: 0.9581
+[2025-04-28 16:43:16,556] INFO - Eval (Q7) - [30/61]    img/s: 4.61    loss: 0.0267    psnr: 30.3057    ms-ssim: 0.9593
+[2025-04-28 16:43:18,782] INFO - Eval (Q7) - [45/61]    img/s: 5.15    loss: 0.0269    psnr: 30.2700    ms-ssim: 0.9585
+[2025-04-28 16:43:21,849] INFO - Eval (Q7) - [60/61]    img/s: 5.08    loss: 0.0273    psnr: 30.2390    ms-ssim: 0.9571
+[2025-04-28 16:43:22,053] INFO - Eval (Q7) - [61/61]    img/s: 5.08    loss: 0.0274    psnr: 30.2215    ms-ssim: 0.9569
+[2025-04-28 16:43:22,053] INFO - ***        psnr: 30.2215 ms-ssim: 0.9569  @ 0.1484bpp
+[2025-04-28 16:43:22,062] INFO - Compress model weights into bitstream
+[2025-04-28 16:43:22,062] INFO - ***  Quant level: 6bits
+[2025-04-28 16:43:22,062] INFO - ***  Sparsity: 0.1500
+[2025-04-28 16:43:24,253] INFO - Model bitstream saved in /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/bitstreams/Q6.zip
+[2025-04-28 16:43:24,267] INFO - Compressed model size: 2.02MB
+[2025-04-28 16:43:24,267] INFO - Bits Per Pixel (BPP): 0.1276
+[2025-04-28 16:43:24,274] INFO - Decompress model weights from bitstream
+[2025-04-28 16:43:25,317] INFO - Model restored from /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/bitstreams/Q6.zip
+[2025-04-28 16:43:28,615] INFO - Eval (Q6) - [15/61]    img/s: 4.56    loss: 0.0269    psnr: 30.2919    ms-ssim: 0.9592
+[2025-04-28 16:43:31,680] INFO - Eval (Q6) - [30/61]    img/s: 4.72    loss: 0.0260    psnr: 30.5048    ms-ssim: 0.9604
+[2025-04-28 16:43:34,735] INFO - Eval (Q6) - [45/61]    img/s: 4.78    loss: 0.0261    psnr: 30.4656    ms-ssim: 0.9596
+[2025-04-28 16:43:37,803] INFO - Eval (Q6) - [60/61]    img/s: 4.81    loss: 0.0266    psnr: 30.4339    ms-ssim: 0.9582
+[2025-04-28 16:43:38,009] INFO - Eval (Q6) - [61/61]    img/s: 4.81    loss: 0.0266    psnr: 30.4155    ms-ssim: 0.9580
+[2025-04-28 16:43:38,009] INFO - ***        psnr: 30.4155 ms-ssim: 0.9580  @ 0.1276bpp
+[2025-04-28 16:44:12,689] INFO - Train (QAT) - Epoch 10 [1098/4392]    lr: 2.06e-06    img/s: 0.44    loss: 0.0262    psnr: 32.2878
+[2025-04-28 16:44:46,643] INFO - Train (QAT) - Epoch 10 [2196/4392]    lr: 2.03e-06    img/s: 0.45    loss: 0.0263    psnr: 32.3635
+[2025-04-28 16:45:21,365] INFO - Train (QAT) - Epoch 10 [3294/4392]    lr: 1.99e-06    img/s: 0.44    loss: 0.0261    psnr: 32.4337
+[2025-04-28 16:45:55,642] INFO - Train (QAT) - Epoch 10 [4392/4392]    lr: 1.96e-06    img/s: 0.44    loss: 0.0261    psnr: 32.3992
+[2025-04-28 16:46:32,898] INFO - Train (QAT) - Epoch 11 [1098/4392]    lr: 1.93e-06    img/s: 0.41    loss: 0.0257    psnr: 32.5682
+[2025-04-28 16:47:09,343] INFO - Train (QAT) - Epoch 11 [2196/4392]    lr: 1.90e-06    img/s: 0.41    loss: 0.0257    psnr: 32.5293
+[2025-04-28 16:47:45,466] INFO - Train (QAT) - Epoch 11 [3294/4392]    lr: 1.86e-06    img/s: 0.42    loss: 0.0259    psnr: 32.4543
+[2025-04-28 16:48:21,121] INFO - Train (QAT) - Epoch 11 [4392/4392]    lr: 1.83e-06    img/s: 0.42    loss: 0.0261    psnr: 32.4079
+[2025-04-28 16:48:56,090] INFO - Train (QAT) - Epoch 12 [1098/4392]    lr: 1.79e-06    img/s: 0.44    loss: 0.0262    psnr: 32.4360
+[2025-04-28 16:49:31,634] INFO - Train (QAT) - Epoch 12 [2196/4392]    lr: 1.76e-06    img/s: 0.43    loss: 0.0261    psnr: 32.4158
+[2025-04-28 16:50:06,396] INFO - Train (QAT) - Epoch 12 [3294/4392]    lr: 1.72e-06    img/s: 0.43    loss: 0.0262    psnr: 32.3852
+[2025-04-28 16:50:42,659] INFO - Train (QAT) - Epoch 12 [4392/4392]    lr: 1.69e-06    img/s: 0.43    loss: 0.0261    psnr: 32.4179
+[2025-04-28 16:51:19,638] INFO - Train (QAT) - Epoch 13 [1098/4392]    lr: 1.65e-06    img/s: 0.41    loss: 0.0256    psnr: 32.5482
+[2025-04-28 16:51:57,086] INFO - Train (QAT) - Epoch 13 [2196/4392]    lr: 1.62e-06    img/s: 0.41    loss: 0.0258    psnr: 32.4681
+[2025-04-28 16:52:33,525] INFO - Train (QAT) - Epoch 13 [3294/4392]    lr: 1.58e-06    img/s: 0.41    loss: 0.0261    psnr: 32.3964
+[2025-04-28 16:53:10,088] INFO - Train (QAT) - Epoch 13 [4392/4392]    lr: 1.55e-06    img/s: 0.41    loss: 0.0260    psnr: 32.4265
+[2025-04-28 16:53:45,539] INFO - Train (QAT) - Epoch 14 [1098/4392]    lr: 1.51e-06    img/s: 0.43    loss: 0.0258    psnr: 32.4579
+[2025-04-28 16:54:21,621] INFO - Train (QAT) - Epoch 14 [2196/4392]    lr: 1.47e-06    img/s: 0.43    loss: 0.0259    psnr: 32.4888
+[2025-04-28 16:54:57,952] INFO - Train (QAT) - Epoch 14 [3294/4392]    lr: 1.44e-06    img/s: 0.42    loss: 0.0260    psnr: 32.4357
+[2025-04-28 16:55:34,078] INFO - Train (QAT) - Epoch 14 [4392/4392]    lr: 1.40e-06    img/s: 0.42    loss: 0.0260    psnr: 32.4352
+[2025-04-28 16:56:12,154] INFO - Train (QAT) - Epoch 15 [1098/4392]    lr: 1.37e-06    img/s: 0.40    loss: 0.0259    psnr: 32.4023
+[2025-04-28 16:56:48,426] INFO - Train (QAT) - Epoch 15 [2196/4392]    lr: 1.33e-06    img/s: 0.41    loss: 0.0258    psnr: 32.4888
+[2025-04-28 16:57:25,214] INFO - Train (QAT) - Epoch 15 [3294/4392]    lr: 1.29e-06    img/s: 0.41    loss: 0.0260    psnr: 32.4323
+[2025-04-28 16:58:02,254] INFO - Train (QAT) - Epoch 15 [4392/4392]    lr: 1.26e-06    img/s: 0.41    loss: 0.0260    psnr: 32.4421
+[2025-04-28 16:58:39,439] INFO - Train (QAT) - Epoch 16 [1098/4392]    lr: 1.22e-06    img/s: 0.41    loss: 0.0259    psnr: 32.4397
+[2025-04-28 16:59:15,099] INFO - Train (QAT) - Epoch 16 [2196/4392]    lr: 1.19e-06    img/s: 0.42    loss: 0.0261    psnr: 32.3834
+[2025-04-28 16:59:50,396] INFO - Train (QAT) - Epoch 16 [3294/4392]    lr: 1.15e-06    img/s: 0.42    loss: 0.0261    psnr: 32.4080
+[2025-04-28 17:00:25,217] INFO - Train (QAT) - Epoch 16 [4392/4392]    lr: 1.12e-06    img/s: 0.43    loss: 0.0259    psnr: 32.4506
+[2025-04-28 17:01:04,316] INFO - Train (QAT) - Epoch 17 [1098/4392]    lr: 1.08e-06    img/s: 0.39    loss: 0.0257    psnr: 32.5506
+[2025-04-28 17:01:41,799] INFO - Train (QAT) - Epoch 17 [2196/4392]    lr: 1.05e-06    img/s: 0.40    loss: 0.0257    psnr: 32.5198
+[2025-04-28 17:02:17,339] INFO - Train (QAT) - Epoch 17 [3294/4392]    lr: 1.01e-06    img/s: 0.41    loss: 0.0258    psnr: 32.4973
+[2025-04-28 17:02:51,838] INFO - Train (QAT) - Epoch 17 [4392/4392]    lr: 9.78e-07    img/s: 0.42    loss: 0.0259    psnr: 32.4575
+[2025-04-28 17:03:26,266] INFO - Train (QAT) - Epoch 18 [1098/4392]    lr: 9.44e-07    img/s: 0.44    loss: 0.0259    psnr: 32.4451
+[2025-04-28 17:04:00,412] INFO - Train (QAT) - Epoch 18 [2196/4392]    lr: 9.10e-07    img/s: 0.44    loss: 0.0257    psnr: 32.4957
+[2025-04-28 17:04:35,777] INFO - Train (QAT) - Epoch 18 [3294/4392]    lr: 8.77e-07    img/s: 0.44    loss: 0.0258    psnr: 32.4717
+[2025-04-28 17:05:11,819] INFO - Train (QAT) - Epoch 18 [4392/4392]    lr: 8.44e-07    img/s: 0.44    loss: 0.0259    psnr: 32.4616
+[2025-04-28 17:05:46,482] INFO - Train (QAT) - Epoch 19 [1098/4392]    lr: 8.11e-07    img/s: 0.44    loss: 0.0261    psnr: 32.4011
+[2025-04-28 17:06:23,261] INFO - Train (QAT) - Epoch 19 [2196/4392]    lr: 7.79e-07    img/s: 0.43    loss: 0.0260    psnr: 32.4055
+[2025-04-28 17:06:59,180] INFO - Train (QAT) - Epoch 19 [3294/4392]    lr: 7.47e-07    img/s: 0.43    loss: 0.0260    psnr: 32.4159
+[2025-04-28 17:07:35,854] INFO - Train (QAT) - Epoch 19 [4392/4392]    lr: 7.15e-07    img/s: 0.42    loss: 0.0259    psnr: 32.4684
+[2025-04-28 17:07:35,867] INFO - Compress model weights into bitstream
+[2025-04-28 17:07:35,867] INFO - ***  Quant level: 8bits
+[2025-04-28 17:07:35,867] INFO - ***  Sparsity: 0.1500
+[2025-04-28 17:07:43,791] INFO - Model bitstream saved in /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/bitstreams/Q8.zip
+[2025-04-28 17:07:43,801] INFO - Compressed model size: 2.68MB
+[2025-04-28 17:07:43,801] INFO - Bits Per Pixel (BPP): 0.1695
+[2025-04-28 17:07:43,806] INFO - Decompress model weights from bitstream
+[2025-04-28 17:07:47,382] INFO - Model restored from /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/bitstreams/Q8.zip
+[2025-04-28 17:07:50,835] INFO - Eval (Q8) - [15/61]    img/s: 4.35    loss: 0.0271    psnr: 30.2367    ms-ssim: 0.9589
+[2025-04-28 17:07:53,049] INFO - Eval (Q8) - [30/61]    img/s: 5.30    loss: 0.0262    psnr: 30.4411    ms-ssim: 0.9601
+[2025-04-28 17:07:56,138] INFO - Eval (Q8) - [45/61]    img/s: 5.14    loss: 0.0263    psnr: 30.4079    ms-ssim: 0.9593
+[2025-04-28 17:07:59,215] INFO - Eval (Q8) - [60/61]    img/s: 5.07    loss: 0.0267    psnr: 30.3766    ms-ssim: 0.9580
+[2025-04-28 17:07:59,422] INFO - Eval (Q8) - [61/61]    img/s: 5.07    loss: 0.0268    psnr: 30.3588    ms-ssim: 0.9578
+[2025-04-28 17:07:59,422] INFO - ***        psnr: 30.3588 ms-ssim: 0.9578  @ 0.1695bpp
+[2025-04-28 17:07:59,433] INFO - Compress model weights into bitstream
+[2025-04-28 17:07:59,433] INFO - ***  Quant level: 7bits
+[2025-04-28 17:07:59,433] INFO - ***  Sparsity: 0.1500
+[2025-04-28 17:08:03,106] INFO - Model bitstream saved in /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/bitstreams/Q7.zip
+[2025-04-28 17:08:03,114] INFO - Compressed model size: 2.34MB
+[2025-04-28 17:08:03,114] INFO - Bits Per Pixel (BPP): 0.1483
+[2025-04-28 17:08:03,119] INFO - Decompress model weights from bitstream
+[2025-04-28 17:08:04,968] INFO - Model restored from /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/bitstreams/Q7.zip
+[2025-04-28 17:08:08,407] INFO - Eval (Q7) - [15/61]    img/s: 4.37    loss: 0.0275    psnr: 30.1593    ms-ssim: 0.9583
+[2025-04-28 17:08:11,492] INFO - Eval (Q7) - [30/61]    img/s: 4.60    loss: 0.0266    psnr: 30.3634    ms-ssim: 0.9595
+[2025-04-28 17:08:14,584] INFO - Eval (Q7) - [45/61]    img/s: 4.68    loss: 0.0268    psnr: 30.3268    ms-ssim: 0.9588
+[2025-04-28 17:08:17,642] INFO - Eval (Q7) - [60/61]    img/s: 4.74    loss: 0.0272    psnr: 30.2955    ms-ssim: 0.9574
+[2025-04-28 17:08:17,847] INFO - Eval (Q7) - [61/61]    img/s: 4.74    loss: 0.0273    psnr: 30.2780    ms-ssim: 0.9572
+[2025-04-28 17:08:17,848] INFO - ***        psnr: 30.2780 ms-ssim: 0.9572  @ 0.1483bpp
+[2025-04-28 17:08:17,856] INFO - Compress model weights into bitstream
+[2025-04-28 17:08:17,856] INFO - ***  Quant level: 6bits
+[2025-04-28 17:08:17,856] INFO - ***  Sparsity: 0.1500
+[2025-04-28 17:08:20,072] INFO - Model bitstream saved in /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/bitstreams/Q6.zip
+[2025-04-28 17:08:20,084] INFO - Compressed model size: 2.02MB
+[2025-04-28 17:08:20,084] INFO - Bits Per Pixel (BPP): 0.1276
+[2025-04-28 17:08:20,090] INFO - Decompress model weights from bitstream
+[2025-04-28 17:08:21,158] INFO - Model restored from /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/bitstreams/Q6.zip
+[2025-04-28 17:08:23,688] INFO - Eval (Q6) - [15/61]    img/s: 5.94    loss: 0.0266    psnr: 30.3610    ms-ssim: 0.9597
+[2025-04-28 17:08:26,770] INFO - Eval (Q6) - [30/61]    img/s: 5.35    loss: 0.0257    psnr: 30.5756    ms-ssim: 0.9608
+[2025-04-28 17:08:29,833] INFO - Eval (Q6) - [45/61]    img/s: 5.19    loss: 0.0259    psnr: 30.5362    ms-ssim: 0.9600
+[2025-04-28 17:08:32,906] INFO - Eval (Q6) - [60/61]    img/s: 5.11    loss: 0.0263    psnr: 30.5044    ms-ssim: 0.9587
+[2025-04-28 17:08:33,118] INFO - Eval (Q6) - [61/61]    img/s: 5.10    loss: 0.0264    psnr: 30.4860    ms-ssim: 0.9585
+[2025-04-28 17:08:33,119] INFO - ***        psnr: 30.4860 ms-ssim: 0.9585  @ 0.1276bpp
+[2025-04-28 17:08:33,542] INFO - Saving new best checkpoint: /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/checkpoints/checkpoint_best
+[2025-04-28 17:09:12,272] INFO - Train (QAT) - Epoch 20 [1098/4392]    lr: 6.84e-07    img/s: 0.39    loss: 0.0255    psnr: 32.5264
+[2025-04-28 17:09:47,365] INFO - Train (QAT) - Epoch 20 [2196/4392]    lr: 6.54e-07    img/s: 0.41    loss: 0.0258    psnr: 32.4650
+[2025-04-28 17:10:20,863] INFO - Train (QAT) - Epoch 20 [3294/4392]    lr: 6.24e-07    img/s: 0.43    loss: 0.0259    psnr: 32.4693
+[2025-04-28 17:10:52,769] INFO - Train (QAT) - Epoch 20 [4392/4392]    lr: 5.95e-07    img/s: 0.44    loss: 0.0259    psnr: 32.4729
+[2025-04-28 17:11:30,131] INFO - Train (QAT) - Epoch 21 [1098/4392]    lr: 5.66e-07    img/s: 0.41    loss: 0.0254    psnr: 32.5793
+[2025-04-28 17:12:02,834] INFO - Train (QAT) - Epoch 21 [2196/4392]    lr: 5.37e-07    img/s: 0.44    loss: 0.0259    psnr: 32.4602
+[2025-04-28 17:12:37,118] INFO - Train (QAT) - Epoch 21 [3294/4392]    lr: 5.10e-07    img/s: 0.44    loss: 0.0259    psnr: 32.4656
+[2025-04-28 17:13:13,599] INFO - Train (QAT) - Epoch 21 [4392/4392]    lr: 4.83e-07    img/s: 0.43    loss: 0.0258    psnr: 32.4778
+[2025-04-28 17:13:45,188] INFO - Train (QAT) - Epoch 22 [1098/4392]    lr: 4.56e-07    img/s: 0.48    loss: 0.0259    psnr: 32.4718
+[2025-04-28 17:14:18,765] INFO - Train (QAT) - Epoch 22 [2196/4392]    lr: 4.31e-07    img/s: 0.47    loss: 0.0258    psnr: 32.4832
+[2025-04-28 17:14:52,381] INFO - Train (QAT) - Epoch 22 [3294/4392]    lr: 4.05e-07    img/s: 0.46    loss: 0.0257    psnr: 32.4939
+[2025-04-28 17:15:26,900] INFO - Train (QAT) - Epoch 22 [4392/4392]    lr: 3.81e-07    img/s: 0.46    loss: 0.0258    psnr: 32.4818
+[2025-04-28 17:16:00,597] INFO - Train (QAT) - Epoch 23 [1098/4392]    lr: 3.57e-07    img/s: 0.45    loss: 0.0258    psnr: 32.5067
+[2025-04-28 17:16:34,679] INFO - Train (QAT) - Epoch 23 [2196/4392]    lr: 3.34e-07    img/s: 0.45    loss: 0.0257    psnr: 32.5147
+[2025-04-28 17:17:08,977] INFO - Train (QAT) - Epoch 23 [3294/4392]    lr: 3.12e-07    img/s: 0.45    loss: 0.0258    psnr: 32.4604
+[2025-04-28 17:17:45,179] INFO - Train (QAT) - Epoch 23 [4392/4392]    lr: 2.90e-07    img/s: 0.44    loss: 0.0258    psnr: 32.4841
+[2025-04-28 17:18:19,303] INFO - Train (QAT) - Epoch 24 [1098/4392]    lr: 2.70e-07    img/s: 0.45    loss: 0.0255    psnr: 32.6174
+[2025-04-28 17:18:52,866] INFO - Train (QAT) - Epoch 24 [2196/4392]    lr: 2.50e-07    img/s: 0.45    loss: 0.0258    psnr: 32.5329
+[2025-04-28 17:19:26,816] INFO - Train (QAT) - Epoch 24 [3294/4392]    lr: 2.30e-07    img/s: 0.45    loss: 0.0259    psnr: 32.4750
+[2025-04-28 17:20:00,534] INFO - Train (QAT) - Epoch 24 [4392/4392]    lr: 2.12e-07    img/s: 0.45    loss: 0.0258    psnr: 32.4876
+[2025-04-28 17:20:40,417] INFO - Train (QAT) - Epoch 25 [1098/4392]    lr: 1.94e-07    img/s: 0.38    loss: 0.0261    psnr: 32.3321
+[2025-04-28 17:21:14,656] INFO - Train (QAT) - Epoch 25 [2196/4392]    lr: 1.78e-07    img/s: 0.41    loss: 0.0262    psnr: 32.3883
+[2025-04-28 17:21:49,860] INFO - Train (QAT) - Epoch 25 [3294/4392]    lr: 1.62e-07    img/s: 0.42    loss: 0.0258    psnr: 32.4656
+[2025-04-28 17:22:25,820] INFO - Train (QAT) - Epoch 25 [4392/4392]    lr: 1.47e-07    img/s: 0.42    loss: 0.0258    psnr: 32.4896
+[2025-04-28 17:23:04,144] INFO - Train (QAT) - Epoch 26 [1098/4392]    lr: 1.32e-07    img/s: 0.40    loss: 0.0262    psnr: 32.3898
+[2025-04-28 17:23:38,234] INFO - Train (QAT) - Epoch 26 [2196/4392]    lr: 1.19e-07    img/s: 0.42    loss: 0.0259    psnr: 32.4517
+[2025-04-28 17:24:10,754] INFO - Train (QAT) - Epoch 26 [3294/4392]    lr: 1.07e-07    img/s: 0.44    loss: 0.0259    psnr: 32.4721
+[2025-04-28 17:24:43,431] INFO - Train (QAT) - Epoch 26 [4392/4392]    lr: 9.51e-08    img/s: 0.44    loss: 0.0258    psnr: 32.4905
+[2025-04-28 17:25:16,557] INFO - Train (QAT) - Epoch 27 [1098/4392]    lr: 8.44e-08    img/s: 0.46    loss: 0.0263    psnr: 32.4176
+[2025-04-28 17:25:49,811] INFO - Train (QAT) - Epoch 27 [2196/4392]    lr: 7.46e-08    img/s: 0.46    loss: 0.0262    psnr: 32.4022
+[2025-04-28 17:26:24,148] INFO - Train (QAT) - Epoch 27 [3294/4392]    lr: 6.58e-08    img/s: 0.45    loss: 0.0259    psnr: 32.4795
+[2025-04-28 17:26:56,815] INFO - Train (QAT) - Epoch 27 [4392/4392]    lr: 5.78e-08    img/s: 0.46    loss: 0.0258    psnr: 32.4920
+[2025-04-28 17:27:30,221] INFO - Train (QAT) - Epoch 28 [1098/4392]    lr: 5.08e-08    img/s: 0.46    loss: 0.0258    psnr: 32.5376
+[2025-04-28 17:28:04,117] INFO - Train (QAT) - Epoch 28 [2196/4392]    lr: 4.47e-08    img/s: 0.45    loss: 0.0257    psnr: 32.4588
+[2025-04-28 17:28:38,579] INFO - Train (QAT) - Epoch 28 [3294/4392]    lr: 3.95e-08    img/s: 0.45    loss: 0.0257    psnr: 32.4974
+[2025-04-28 17:32:47,335] INFO - Train (QAT) - Epoch 28 [4392/4392]    lr: 3.53e-08    img/s: 0.17    loss: 0.0258    psnr: 32.4927
+[2025-04-28 17:33:22,023] INFO - Train (QAT) - Epoch 29 [1098/4392]    lr: 3.20e-08    img/s: 0.44    loss: 0.0259    psnr: 32.5092
+[2025-04-28 17:33:55,043] INFO - Train (QAT) - Epoch 29 [2196/4392]    lr: 2.97e-08    img/s: 0.45    loss: 0.0260    psnr: 32.4483
+[2025-04-28 17:34:29,630] INFO - Train (QAT) - Epoch 29 [3294/4392]    lr: 2.82e-08    img/s: 0.45    loss: 0.0259    psnr: 32.4786
+[2025-04-28 17:35:03,059] INFO - Train (QAT) - Epoch 29 [4392/4392]    lr: 2.78e-08    img/s: 0.45    loss: 0.0258    psnr: 32.4936
+[2025-04-28 17:35:03,099] INFO - Compress model weights into bitstream
+[2025-04-28 17:35:03,099] INFO - ***  Quant level: 8bits
+[2025-04-28 17:35:03,099] INFO - ***  Sparsity: 0.1500
+[2025-04-28 17:35:11,428] INFO - Model bitstream saved in /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/bitstreams/Q8.zip
+[2025-04-28 17:35:11,437] INFO - Compressed model size: 2.68MB
+[2025-04-28 17:35:11,438] INFO - Bits Per Pixel (BPP): 0.1694
+[2025-04-28 17:35:11,441] INFO - Decompress model weights from bitstream
+[2025-04-28 17:35:14,413] INFO - Model restored from /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/bitstreams/Q8.zip
+[2025-04-28 17:35:24,483] INFO - Eval (Q8) - [15/61]    img/s: 1.49    loss: 0.0270    psnr: 30.2377    ms-ssim: 0.9589
+[2025-04-28 17:35:33,741] INFO - Eval (Q8) - [30/61]    img/s: 1.55    loss: 0.0261    psnr: 30.4431    ms-ssim: 0.9601
+[2025-04-28 17:35:43,611] INFO - Eval (Q8) - [45/61]    img/s: 1.54    loss: 0.0263    psnr: 30.4097    ms-ssim: 0.9593
+[2025-04-28 17:35:53,395] INFO - Eval (Q8) - [60/61]    img/s: 1.54    loss: 0.0267    psnr: 30.3788    ms-ssim: 0.9580
+[2025-04-28 17:35:54,071] INFO - Eval (Q8) - [61/61]    img/s: 1.54    loss: 0.0268    psnr: 30.3610    ms-ssim: 0.9578
+[2025-04-28 17:35:54,542] INFO - ***        psnr: 30.3610 ms-ssim: 0.9578  @ 0.1694bpp
+[2025-04-28 17:35:54,557] INFO - Compress model weights into bitstream
+[2025-04-28 17:35:54,557] INFO - ***  Quant level: 7bits
+[2025-04-28 17:35:54,557] INFO - ***  Sparsity: 0.1500
+[2025-04-28 17:35:58,273] INFO - Model bitstream saved in /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/bitstreams/Q7.zip
+[2025-04-28 17:35:58,284] INFO - Compressed model size: 2.34MB
+[2025-04-28 17:35:58,285] INFO - Bits Per Pixel (BPP): 0.1482
+[2025-04-28 17:35:58,289] INFO - Decompress model weights from bitstream
+[2025-04-28 17:35:59,926] INFO - Model restored from /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/bitstreams/Q7.zip
+[2025-04-28 17:36:09,251] INFO - Eval (Q7) - [15/61]    img/s: 1.61    loss: 0.0274    psnr: 30.1694    ms-ssim: 0.9584
+[2025-04-28 17:36:19,464] INFO - Eval (Q7) - [30/61]    img/s: 1.54    loss: 0.0265    psnr: 30.3725    ms-ssim: 0.9596
+[2025-04-28 17:36:29,329] INFO - Eval (Q7) - [45/61]    img/s: 1.53    loss: 0.0267    psnr: 30.3358    ms-ssim: 0.9588
+[2025-04-28 17:36:38,356] INFO - Eval (Q7) - [60/61]    img/s: 1.56    loss: 0.0271    psnr: 30.3050    ms-ssim: 0.9575
+[2025-04-28 17:36:38,984] INFO - Eval (Q7) - [61/61]    img/s: 1.56    loss: 0.0272    psnr: 30.2874    ms-ssim: 0.9573
+[2025-04-28 17:36:39,431] INFO - ***        psnr: 30.2874 ms-ssim: 0.9573  @ 0.1482bpp
+[2025-04-28 17:36:39,438] INFO - Compress model weights into bitstream
+[2025-04-28 17:36:39,438] INFO - ***  Quant level: 6bits
+[2025-04-28 17:36:39,438] INFO - ***  Sparsity: 0.1500
+[2025-04-28 17:36:41,366] INFO - Model bitstream saved in /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/bitstreams/Q6.zip
+[2025-04-28 17:36:41,373] INFO - Compressed model size: 2.02MB
+[2025-04-28 17:36:41,373] INFO - Bits Per Pixel (BPP): 0.1276
+[2025-04-28 17:36:41,375] INFO - Decompress model weights from bitstream
+[2025-04-28 17:36:42,410] INFO - Model restored from /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/bitstreams/Q6.zip
+[2025-04-28 17:36:52,315] INFO - Eval (Q6) - [15/61]    img/s: 1.52    loss: 0.0266    psnr: 30.3758    ms-ssim: 0.9598
+[2025-04-28 17:37:02,105] INFO - Eval (Q6) - [30/61]    img/s: 1.52    loss: 0.0257    psnr: 30.5918    ms-ssim: 0.9610
+[2025-04-28 17:37:11,877] INFO - Eval (Q6) - [45/61]    img/s: 1.53    loss: 0.0258    psnr: 30.5532    ms-ssim: 0.9601
+[2025-04-28 17:37:21,791] INFO - Eval (Q6) - [60/61]    img/s: 1.52    loss: 0.0263    psnr: 30.5216    ms-ssim: 0.9588
+[2025-04-28 17:37:22,481] INFO - Eval (Q6) - [61/61]    img/s: 1.52    loss: 0.0263    psnr: 30.5030    ms-ssim: 0.9586
+[2025-04-28 17:37:22,145] INFO - ***        psnr: 30.5030 ms-ssim: 0.9586  @ 0.1276bpp
+[2025-04-28 17:37:22,515] INFO - Saving new best checkpoint: /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03/checkpoints/checkpoint_best
+[2025-04-28 17:37:22,522] INFO - Training completed in: 3:58:30.808985
+[2025-04-28 17:37:22,522] INFO - Output are located in: /home/hayfa/projects/HiNeRV/video/ReadySetGo-HiNeRV-20250428-133851-a695cd03

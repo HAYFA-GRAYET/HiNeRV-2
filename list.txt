@@ -1,0 +1,2 @@
+file '/home/hayfa/projects/HiNeRV/video/output_video1.mp4'
+file '/home/hayfa/projects/HiNeRV/video/output_video.mp4'

@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QFileDialog, QGroupBox, QSizePolicy, QFrame
 )
-from PySide6.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize
+from PySide6.QtCore import Qt, QThread, Signal, QTimer, QSize
 from PySide6.QtGui import QPixmap, QMovie, QDragEnterEvent, QDropEvent
 from PySide6.QtMultimedia import QMediaPlayer
 from PySide6.QtMultimediaWidgets import QVideoWidget
@@ -22,8 +22,8 @@ from PySide6.QtMultimediaWidgets import QVideoWidget
 class VideoAnalyzer(QThread):
     """Background thread for video analysis"""
     
-    analysis_complete = pyqtSignal(dict)
-    error_occurred = pyqtSignal(str)
+    analysis_complete = Signal(dict)
+    error_occurred = Signal(str)
     
     def __init__(self, video_path: str):
         super().__init__()
@@ -91,8 +91,8 @@ class VideoAnalyzer(QThread):
 class VideoPreviewWidget(QWidget):
     """Widget for video preview and selection"""
     
-    video_loaded = pyqtSignal(dict)
-    video_error = pyqtSignal(str)
+    video_loaded = Signal(dict)
+    video_error = Signal(str)
     
     def __init__(self):
         super().__init__()

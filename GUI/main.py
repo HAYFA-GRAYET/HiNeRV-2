@@ -21,8 +21,8 @@ from PySide6.QtWidgets import (
     QSplashScreen, QSystemTrayIcon, QMenu
 )
 from PySide6.QtCore import (
-    Qt, QThread, QTimer, pyqtSignal, QSettings, QStandardPaths,
-    QSize, pyqtSlot, QEvent, QUrl
+    Qt, QThread, QTimer, Signal, QSettings, QStandardPaths,
+    QSize, Slot, QEvent, QUrl
 )
 from PySide6.QtGui import (
     QFont, QPixmap, QIcon, QDesktopServices, QKeySequence,

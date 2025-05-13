@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QScrollArea, QFrame, QGroupBox, QSplitter,
     QTabWidget, QTableWidget, QTableWidgetItem
 )
-from PySide6.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot
+from PySide6.QtCore import Qt, QTimer, Signal, Slot
 from PySide6.QtGui import QFont, QPixmap, QColor
 from PySide6.QtCharts import (
     QChart, QChartView, QLineSeries, QValueAxis, QDateTimeAxis

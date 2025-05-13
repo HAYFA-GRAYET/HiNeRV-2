@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QSlider, QFileDialog, QMessageBox, QTabWidget, QSpinBox,
     QTableWidget, QTableWidgetItem, QHeaderView, QSplitter
 )
-from PySide6.QtCore import Qt, pyqtSignal, QThread, pyqtSlot, QTimer
+from PySide6.QtCore import Qt, Signal, QThread, Slot, QTimer
 from PySide6.QtGui import QFont, QPixmap, QIcon
 from PySide6.QtCharts import QChart, QChartView, QLineSeries, QValueAxis, QDateTimeAxis
 
@@ -25,7 +25,7 @@ from ..utils import format_duration, format_filesize, calculate_bitrate
 class VideoPreviewPlayer(QThread):
     """Thread for playing video preview"""
     
-    frame_ready = pyqtSignal(QPixmap)
+    frame_ready = Signal(QPixmap)
     
     def __init__(self, video_path: str):
         super().__init__()

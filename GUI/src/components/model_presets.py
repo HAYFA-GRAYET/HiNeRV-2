@@ -14,13 +14,13 @@ from PySide6.QtWidgets import (
     QGroupBox, QTextEdit, QFormLayout, QSpinBox, QDoubleSpinBox,
     QScrollArea, QFrame, QSizePolicy
 )
-from PySide6.QtCore import pyqtSignal, Qt
+from PySide6.QtCore import Signal, Qt
 
 
 class ModelPresetsWidget(QWidget):
     """Widget for selecting and configuring model presets"""
     
-    preset_changed = pyqtSignal(dict)
+    preset_changed = Signal(dict)
     
     def __init__(self, config_manager):
         super().__init__()

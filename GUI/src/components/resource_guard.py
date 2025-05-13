@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QPushButton, QProgressBar, QTextEdit, QTabWidget, QScrollArea,
     QGridLayout, QFrame
 )
-from PySide6.QtCore import Qt, QTimer, pyqtSignal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QFont, QPixmap, QIcon
 from PySide6.QtCharts import QChart, QChartView, QLineSeries, QValueAxis
 
@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 class ResourceGuardWidget(QWidget):
     """Widget for monitoring and controlling system resources"""
     
-    limits_changed = pyqtSignal(dict)
+    limits_changed = Signal(dict)
     
     def __init__(self, parent=None):
         super().__init__(parent)

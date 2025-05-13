@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QSpinBox, QDoubleSpinBox, QComboBox, QLineEdit, QCheckBox,
     QSlider, QLabel, QPushButton, QScrollArea, QFrame, QTabWidget
 )
-from PySide6.QtCore import Qt, pyqtSignal
+from PySide6.QtCore import Qt, Signal
 from typing import Dict, Any
 import os
 import json
@@ -17,7 +17,7 @@ import json
 class TrainingOptionsWidget(QWidget):
     """Widget for configuring training parameters"""
     
-    options_changed = pyqtSignal(dict)
+    options_changed = Signal(dict)
     
     def __init__(self, config_manager):
         super().__init__()

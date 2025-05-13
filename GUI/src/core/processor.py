@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime, timedelta
 
-from PySide6.QtCore import QThread, pyqtSignal, pyqtSlot
+from PySide6.QtCore import QThread, Signal, Slot
 
 from .video_processor import VideoProcessor
 from .system_monitor import SystemMonitor
@@ -30,10 +30,10 @@ class HiNeRVProcessor(QThread):
     """
     
     # Signal definitions
-    progress_updated = pyqtSignal(dict)  # Emit progress updates
-    status_updated = pyqtSignal(str)     # Emit status messages
-    error_occurred = pyqtSignal(str)     # Emit error messages
-    finished = pyqtSignal(dict)          # Emit results when finished
+    progress_updated = Signal(dict)  # Emit progress updates
+    status_updated = Signal(str)     # Emit status messages
+    error_occurred = Signal(str)     # Emit error messages
+    finished = Signal(dict)          # Emit results when finished
     
     def __init__(self, config: Dict[str, Any]):
         super().__init__()

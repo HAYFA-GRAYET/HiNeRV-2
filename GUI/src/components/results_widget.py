@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal, QThread, Slot, QTimer
 from PySide6.QtGui import QFont, QPixmap, QIcon
 from PySide6.QtCharts import QChart, QChartView, QLineSeries, QValueAxis, QDateTimeAxis
+from PySide6.QtGui import QPainter
 
 from ..utils import format_duration, format_filesize, calculate_bitrate
 
@@ -300,7 +301,7 @@ class ResultsWidget(QWidget):
         series.attachAxis(axis_y)
         
         view = QChartView(chart)
-        view.setRenderHint(view.Antialiasing)
+        view.setRenderHint(QPainter.Antialiasing)
         
         return view
     

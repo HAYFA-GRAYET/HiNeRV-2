@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QFont, QPixmap, QIcon
 from PySide6.QtCharts import QChart, QChartView, QLineSeries, QValueAxis
+from PySide6.QtGui import QPainter
 
 try:
     import nvidia_ml_py3 as nvml
@@ -266,7 +267,7 @@ class ResourceGuardWidget(QWidget):
             gpu_chart.addSeries(self.gpu_series)
             
             gpu_chart_view = QChartView(gpu_chart)
-            gpu_chart_view.setRenderHint(gpu_chart_view.Antialiasing)
+            gpu_chart_view.setRenderHint(QPainter.Antialiasing)
             layout.addWidget(gpu_chart_view)
             
             self.usage_charts["gpu"] = {
@@ -283,7 +284,7 @@ class ResourceGuardWidget(QWidget):
         cpu_chart.addSeries(self.cpu_series)
         
         cpu_chart_view = QChartView(cpu_chart)
-        cpu_chart_view.setRenderHint(cpu_chart_view.Antialiasing)
+        cpu_chart_view.setRenderHint(QPainter.Antialiasing)
         layout.addWidget(cpu_chart_view)
         
         self.usage_charts["cpu"] = {
@@ -300,7 +301,7 @@ class ResourceGuardWidget(QWidget):
         ram_chart.addSeries(self.ram_series)
         
         ram_chart_view = QChartView(ram_chart)
-        ram_chart_view.setRenderHint(ram_chart_view.Antialiasing)
+        ram_chart_view.setRenderHint(QPainter.Antialiasing)
         layout.addWidget(ram_chart_view)
         
         self.usage_charts["ram"] = {

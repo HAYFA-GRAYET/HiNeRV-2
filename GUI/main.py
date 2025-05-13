@@ -637,7 +637,7 @@ def check_system_requirements():
     # Check for required packages
     required_packages = [
         'torch', 'torchvision', 'accelerate', 'deepspeed',
-        'pytorch_msssim', 'timm', 'torchac_backend'
+        'pytorch_msssim', 'timm'
     ]
     
     for package in required_packages:

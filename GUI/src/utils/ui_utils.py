@@ -8,7 +8,7 @@ import math
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union, Any, Callable
 
-from PySide6.QtCore import Qt, QSize, QRect, QPoint
+from PySide6.QtCore import Qt, QSize, QRect, QPoint, QEvent
 from PySide6.QtGui import QIcon, QPixmap, QImage, QColor
 from PySide6.QtWidgets import (
     QWidget, QLabel, QPushButton, QHBoxLayout, QVBoxLayout, QGridLayout,

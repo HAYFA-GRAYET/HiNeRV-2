@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QPushButton, QProgressBar, QTextEdit,
     QScrollArea, QFrame, QGroupBox, QSplitter,
-    QTabWidget, QTableWidget, QTableWidgetItem
+    QTabWidget, QTableWidget, QTableWidgetItem,QCheckBox
 )
 from PySide6.QtCore import Qt, QTimer, Signal, Slot
 from PySide6.QtGui import QFont, QPixmap, QColor

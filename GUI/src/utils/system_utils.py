@@ -450,3 +450,29 @@ def get_conda_envs() -> List[str]:
     except Exception as e:
         logger.warning(f"Failed to get conda environments: {e}")
         return []
+    
+"""
+Video utility functions for HiNeRV GUI
+"""
+
+def calculate_bitrate(size_bytes: int, duration_seconds: float) -> float:
+    """
+    Calculate video bitrate in Mbps (Megabits per second)
+    
+    Args:
+        size_bytes (int): Video file size in bytes
+        duration_seconds (float): Video duration in seconds
+        
+    Returns:
+        float: Bitrate in Mbps
+    """
+    if duration_seconds <= 0:
+        return 0.0
+        
+    # Convert bytes to bits and divide by duration to get bits per second
+    bits_per_second = (size_bytes * 8) / duration_seconds
+    
+    # Convert to Mbps
+    mbps = bits_per_second / (1024 * 1024)
+    
+    return mbps

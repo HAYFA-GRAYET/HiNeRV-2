@@ -5,7 +5,7 @@ HiNeRV GUI - Utility Functions
 from .logging_utils import setup_logging
 from .system_utils import (
     get_system_info, check_dependencies, format_duration,
-    format_filesize
+    format_filesize, calculate_bitrate 
 )
 from .ui_utils import (
     create_info_label, create_header, create_separator,

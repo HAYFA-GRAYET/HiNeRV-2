@@ -70,6 +70,8 @@ class MainWindow(QMainWindow):
         
         # Initialize UI
         self.setup_ui()
+        self.system_monitor = SystemMonitor()
+        self.system_monitor.start()
         self.setup_connections()
         self.setup_shortcuts()
         self.load_settings()

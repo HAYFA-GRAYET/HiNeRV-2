@@ -505,3 +505,78 @@ def estimate_batch_size(video_info: Dict, vram_limit_percent: int = 80) -> int:
     except Exception as e:
         # Fall back to conservative default
         return 4
+
+def human_readable_size(size_bytes: float) -> str:
+    """
+    Convert bytes to human readable string format
+    
+    Args:
+        size_bytes: Size in bytes
+        
+    Returns:
+        str: Human readable size string
+    """
+    if size_bytes == 0:
+        return "0B"
+    
+    units = ['B', 'KB', 'MB', 'GB', 'TB']
+    unit_index = 0
+    
+    while size_bytes >= 1024 and unit_index < len(units) - 1:
+        size_bytes /= 1024
+        unit_index += 1
+    
+    return f"{size_bytes:.2f}{units[unit_index]}"
+
+def create_icon_button(
+    icon_name: str,
+    tooltip: str = "",
+    size: int = 24,
+    clickable: bool = True
+) -> QPushButton:
+    """
+    Create a button with an icon
+    
+    Args:
+        icon_name: Name of the icon resource
+        tooltip: Tooltip text for the button
+        size: Size of the button in pixels
+        clickable: Whether the button should be clickable
+        
+    Returns:
+        QPushButton: Button with icon
+    """
+    button = QPushButton()
+    button.setFixedSize(QSize(size, size))
+    button.setIconSize(QSize(size - 8, size - 8))
+    
+    # Load icon from resources
+    icon_path = resource_path(f"icons/{icon_name}")
+    if os.path.exists(icon_path):
+        button.setIcon(QIcon(icon_path))
+    
+    if tooltip:
+        button.setToolTip(tooltip)
+    
+    if not clickable:
+        button.setEnabled(False)
+    
+    button.setObjectName("iconButton")
+    return button
+
+def resource_path(relative_path: str) -> str:
+    """
+    Get absolute path to resource, works for dev and for PyInstaller
+    
+    Args:
+        relative_path: Path relative to resources directory
+        
+    Returns:
+        str: Absolute path to resource
+    """
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "resources"))
+    
+    return os.path.join(base_path, relative_path)

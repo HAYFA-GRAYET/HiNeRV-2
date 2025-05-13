@@ -352,6 +352,12 @@ def get_resource_path(relative_path: str) -> str:
     
     return os.path.join(base_path, relative_path)
 
+def create_separator():
+    """Create a horizontal separator line"""
+    separator = QFrame()
+    separator.setFrameShape(QFrame.HLine)
+    separator.setFrameShadow(QFrame.Sunken)
+    return separator
 
 def create_tooltip(widget: QWidget, text: str) -> None:
     """

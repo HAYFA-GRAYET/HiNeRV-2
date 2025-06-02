@@ -102,31 +102,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
         self.setMinimumSize(1200, 800)
         
-        # Create central widget first
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        
-        # Create menu bar
-        self.create_menu_bar()
-        
-        # Add "P" label positioned relative to menu bar
-        menubar_height = self.menuBar().height()
-        self.logo_label = QLabel("P", self)
-        self.logo_label.setFixedSize(30, 30)
-        self.logo_label.move(10, menubar_height + 5)  # Position below menu bar
-        self.logo_label.setStyleSheet("""
-            QLabel {
-                color: #666;
-                font-size: 18px;
-                font-weight: bold;
-                padding: 5px;
-                background: transparent;
-            }
-        """)
-        self.logo_label.setToolTip("Click 5 times quickly to toggle developer mode")
-        self.logo_label.raise_()  # Bring to front
-    
-        # Apply dark theme
+      
         self.setStyleSheet(create_dark_theme())
         
         # Create central widget with splitter

@@ -159,6 +159,13 @@ class HiNeRVProcessor(QThread):
         self.status_updated.emit("Extracting video metadata...")
         video_info = self.video_processor.get_video_info(video_path)
         
+        # Ensure frame_count exists in video_info
+        if 'frame_count' not in video_info:
+            # Calculate frame count from duration and fps
+            fps = video_info.get('fps', 30)  # Default to 30 fps if not present
+            duration = video_info.get('duration', 0)
+            video_info['frame_count'] = int(duration * fps)
+        
         # Determine frames to extract
         max_frames = self.config['training_options'].get('max_frames', 0)
         if max_frames <= 0:

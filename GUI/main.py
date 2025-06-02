@@ -175,7 +175,6 @@ class MainWindow(QMainWindow):
         
         # System monitor connections
         self.system_monitor.stats_updated.connect(self.on_system_stats_updated)
-    
     def setup_shortcuts(self):
         """Set up keyboard shortcuts"""
         # Open video shortcut
@@ -493,6 +492,7 @@ class MainWindow(QMainWindow):
         """Handle model preset change"""
         self.logger.info(f"Model preset changed: {preset_info['name']}")
         # Update training options based on preset
+       
         self.training_options.load_preset(preset_info)
     
     def on_system_stats_updated(self, stats: Dict):

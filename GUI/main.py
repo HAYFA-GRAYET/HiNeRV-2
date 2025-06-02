@@ -409,7 +409,7 @@ class MainWindow(QMainWindow):
         
         # Check if clicking on help label
         if hasattr(self, 'help_label'):
-            help_pos = self.help_label.mapFromGlobal(event.globalPos())
+            help_pos = self.help_label.mapFromGlobal(event.globalPosition().toPoint())
             if self.help_label.rect().contains(help_pos):
                 current_time = time.time()
                 

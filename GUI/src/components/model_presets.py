@@ -83,6 +83,7 @@ class ModelPresetsWidget(QWidget):
         try:
             # Find all preset files
             models_dir = Path("cfgs/models")
+            print(f"Looking for model presets in: {models_dir}")
             if not models_dir.exists():
                 self.logger.warning(f"Models directory not found: {models_dir}")
                 return

@@ -335,52 +335,75 @@ class HiNeRVProcessor(QThread):
             self.logger.exception("Error running training process")
             raise RuntimeError(f"Error running training process: {str(e)}")
     
-    def _parse_progress_line(self, line: str):
-        """Parse a line of output from the training process"""
+def _parse_progress_line(self, line: str):
+    """Parse a line of output from the training process"""
+    try:
+        # Check if in dev mode
         try:
-            # Check for epoch information
+            from main import DEV_MODE_ENABLED
+        except ImportError:
+            DEV_MODE_ENABLED = False
+
+        if not DEV_MODE_ENABLED:
+            # Simplified progress for non-dev mode
             if "Epoch:" in line:
                 parts = line.split()
                 for i, part in enumerate(parts):
                     if part == "Epoch:":
                         epoch = int(parts[i+1].strip(","))
-                        self.progress_data['epochs_completed'] = epoch
-                    elif part == "Loss:":
-                        loss = float(parts[i+1])
-                        self.progress_data['current_loss'] = loss
-                        self.progress_data['loss_history'].append(loss)
-                    elif part == "PSNR:":
-                        psnr = float(parts[i+1])
-                        self.progress_data['psnr_history'].append(psnr)
-                    elif part == "MS-SSIM:":
-                        ms_ssim = float(parts[i+1])
-                        self.progress_data['ms_ssim_history'].append(ms_ssim)
-                
-                # Calculate ETA
-                if self.start_time and self.progress_data['epochs_completed'] > 0:
-                    elapsed = time.time() - self.start_time
-                    total_epochs = self.progress_data['total_epochs']
-                    completed_epochs = self.progress_data['epochs_completed']
-                    
-                    if completed_epochs > 0:
-                        time_per_epoch = elapsed / completed_epochs
-                        remaining_epochs = total_epochs - completed_epochs
-                        eta_seconds = time_per_epoch * remaining_epochs
+                        total_epochs = self.progress_data['total_epochs']
+                        progress = epoch / total_epochs if total_epochs > 0 else 0
                         
-                        eta = datetime.now() + timedelta(seconds=eta_seconds)
-                        self.progress_data['eta'] = eta.strftime("%H:%M:%S")
+                        self.progress_updated.emit({
+                            'progress': progress,
+                            'status': f"Compressing video... {int(progress * 100)}%",
+                            'elapsed_time': time.time() - self.start_time
+                        })
+                        return
+        
+        # Original detailed progress parsing for dev mode
+        if "Epoch:" in line:
+            parts = line.split()
+            for i, part in enumerate(parts):
+                if part == "Epoch:":
+                    epoch = int(parts[i+1].strip(","))
+                    self.progress_data['epochs_completed'] = epoch
+                elif part == "Loss:":
+                    loss = float(parts[i+1])
+                    self.progress_data['current_loss'] = loss
+                    self.progress_data['loss_history'].append(loss)
+                elif part == "PSNR:":
+                    psnr = float(parts[i+1])
+                    self.progress_data['psnr_history'].append(psnr)
+                elif part == "MS-SSIM:":
+                    ms_ssim = float(parts[i+1])
+                    self.progress_data['ms_ssim_history'].append(ms_ssim)
+            
+            # Calculate ETA
+            if self.start_time and self.progress_data['epochs_completed'] > 0:
+                elapsed = time.time() - self.start_time
+                total_epochs = self.progress_data['total_epochs']
+                completed_epochs = self.progress_data['epochs_completed']
                 
-                # Emit progress update
-                self.progress_updated.emit(self.progress_data)
-                
-                # Update status
-                self.status_updated.emit(
-                    f"Training - Epoch {self.progress_data['epochs_completed']}/{self.progress_data['total_epochs']}, "
-                    f"Loss: {self.progress_data['current_loss']:.4f}"
-                )
-        except Exception as e:
-            # Just log errors in parsing, don't break the process
-            self.logger.error(f"Error parsing progress line: {str(e)}")
+                if completed_epochs > 0:
+                    time_per_epoch = elapsed / completed_epochs
+                    remaining_epochs = total_epochs - completed_epochs
+                    eta_seconds = time_per_epoch * remaining_epochs
+                    
+                    eta = datetime.now() + timedelta(seconds=eta_seconds)
+                    self.progress_data['eta'] = eta.strftime("%H:%M:%S")
+            
+            # Emit progress update
+            self.progress_updated.emit(self.progress_data)
+            
+            # Update status
+            self.status_updated.emit(
+                f"Training - Epoch {self.progress_data['epochs_completed']}/{self.progress_data['total_epochs']}, "
+                f"Loss: {self.progress_data['current_loss']:.4f}"
+            )
+    except Exception as e:
+        # Just log errors in parsing, don't break the process
+        self.logger.error(f"Error parsing progress line: {str(e)}")
     
     def _generate_output(self):
         """Generate the compressed output video"""

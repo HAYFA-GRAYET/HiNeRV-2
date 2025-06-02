@@ -181,6 +181,7 @@ class ResultsWidget(QWidget):
         
         return panel
         
+# In ResultsWidget.create_preview_panel, update the method:
     def create_preview_panel(self) -> QWidget:
         """Create the video preview panel"""
         panel = QWidget()
@@ -196,11 +197,14 @@ class ResultsWidget(QWidget):
         
         # Metrics charts tab
         charts_tab = self.create_charts_tab()
-        tabs.addTab(charts_tab, "Metrics Charts")
+        tabs.addTab(charts_tab, "Quality Metrics")
         
-        # Frame analysis tab
-        frame_analysis_tab = self.create_frame_analysis_tab()
-        tabs.addTab(frame_analysis_tab, "Frame Analysis")
+        # Only show frame analysis in dev mode
+        from main import DEV_MODE_ENABLED
+        if DEV_MODE_ENABLED:
+            # Frame analysis tab
+            frame_analysis_tab = self.create_frame_analysis_tab()
+            tabs.addTab(frame_analysis_tab, "Frame Analysis")
         
         return panel
     

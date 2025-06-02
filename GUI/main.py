@@ -422,7 +422,238 @@ class MainWindow(QMainWindow):
         # Stop shortcut
         QShortcut(QKeySequence("Escape"), self, self.stop_compression)
     
+    # Replace the create_left_panel method:
+    def create_left_panel(self) -> QWidget:
+        """Create the left panel with video selection and options"""
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
         
+        # Video preview and selection
+        self.video_preview = VideoPreviewWidget()
+        layout.addWidget(self.video_preview)
+        
+        # Only show technical tabs in dev mode
+        if self.dev_mode:
+            # Tab widget for different options
+            tabs = QTabWidget()
+            layout.addWidget(tabs)
+            
+            # Model presets tab
+            self.model_presets = ModelPresetsWidget(self.config_manager)
+            tabs.addTab(self.model_presets, "Model Presets")
+            
+            # Training options tab
+            self.training_options = TrainingOptionsWidget(self.config_manager)
+            tabs.addTab(self.training_options, "Training Options")
+            
+            # Resource settings tab
+            self.resource_guard = ResourceGuardWidget()
+            tabs.addTab(self.resource_guard, "Resource Settings")
+        else:
+            # Create widgets but don't show them
+            self.model_presets = ModelPresetsWidget(self.config_manager)
+            self.training_options = TrainingOptionsWidget(self.config_manager)
+            self.resource_guard = ResourceGuardWidget()
+            
+            # Set default values for non-dev mode
+            self.model_presets.preset_combo.setCurrentIndex(0)  # Use first preset
+            self.training_options.epochs_spin.setValue(30)  # Default epochs
+            self.training_options.batch_size_spin.setValue(2)  # Default batch size
+        
+        # Control buttons
+        controls_layout = QHBoxLayout()
+        
+        if self.dev_mode:
+            self.quick_test_btn = QPushButton("Quick Test (30s)")
+            self.quick_test_btn.setIcon(QIcon.fromTheme("media-playback-start"))
+            self.quick_test_btn.clicked.connect(self.run_quick_test)
+            controls_layout.addWidget(self.quick_test_btn)
+        
+        self.start_btn = QPushButton("Compress Video")  # Changed label
+        self.start_btn.setIcon(QIcon.fromTheme("media-record"))
+        self.start_btn.clicked.connect(self.start_compression)
+        self.start_btn.setObjectName("primaryButton")
+        controls_layout.addWidget(self.start_btn)
+        
+        layout.addLayout(controls_layout)
+        
+        return panel
+
+# Replace the create_right_panel method:
+    def create_right_panel(self) -> QWidget:
+        """Create the right panel with progress and results"""
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        
+        # Tab widget for progress and results
+        self.right_tabs = QTabWidget()
+        layout.addWidget(self.right_tabs)
+        
+        # Progress tab - simplified for non-dev mode
+        self.progress_widget = ProgressWidget()
+        if not self.dev_mode:
+            # Hide system stats and training logs in progress widget
+            self.progress_widget.system_stats.setVisible(False)
+            self.progress_widget.log_viewer.setVisible(False)
+        self.right_tabs.addTab(self.progress_widget, "Progress")
+        
+        # Results tab
+        self.results_widget = ResultsWidget()
+        self.right_tabs.addTab(self.results_widget, "Results")
+        
+        # Only show history and logs in dev mode
+        if self.dev_mode:
+            # History tab
+            self.history_widget = HistoryWidget()
+            self.right_tabs.addTab(self.history_widget, "History")
+            
+            # Log viewer tab
+            self.log_viewer = LogViewerWidget()
+            self.right_tabs.addTab(self.log_viewer, "Logs")
+        else:
+            # Create widgets but don't show them
+            self.history_widget = HistoryWidget()
+            self.log_viewer = LogViewerWidget()
+        
+        return panel
+
+    # Add this method to handle secret dev mode activation:
+    def mousePressEvent(self, event):
+        """Handle mouse press events for secret dev mode activation"""
+        super().mousePressEvent(event)
+        
+        # Check if clicking on the logo/title area (top-left corner)
+        if event.pos().x() < 100 and event.pos().y() < 50:
+            current_time = time.time()
+            
+            # Reset counter if too much time has passed
+            if current_time - self.last_click_time > 2.0:
+                self.dev_mode_clicks = 0
+            
+            self.last_click_time = current_time
+            self.dev_mode_clicks += 1
+            
+            # Activate dev mode after 5 clicks
+            if self.dev_mode_clicks >= 5:
+                self.toggle_dev_mode()
+                self.dev_mode_clicks = 0
+
+# Add this method to toggle dev mode:
+    def toggle_dev_mode(self):
+        """Toggle developer mode"""
+        self.dev_mode = not self.dev_mode
+        
+        # Save the setting
+        self.settings.setValue("devMode", self.dev_mode)
+        
+        # Show message
+        if self.dev_mode:
+            QMessageBox.information(self, "Developer Mode", "Developer mode activated!")
+        else:
+            QMessageBox.information(self, "Developer Mode", "Developer mode deactivated!")
+        
+        # Restart the application to apply changes
+        reply = QMessageBox.question(
+            self, "Restart Required",
+            "The application needs to restart to apply changes. Restart now?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            QApplication.quit()
+        # You might want to implement actual restart logic here
+
+# Update the load_settings method to include dev mode:
+    def load_settings(self):
+        """Load application settings"""
+        # Window geometry
+        geometry = self.settings.value("geometry")
+        if geometry:
+            self.restoreGeometry(geometry)
+        
+        # Window state
+        state = self.settings.value("windowState")
+        if state:
+            self.restoreState(state)
+        
+        # Last directory
+        self.last_video_dir = self.settings.value("lastVideoDir", "")
+        self.last_output_dir = self.settings.value("lastOutputDir", "")
+        
+        # Dev mode
+        self.dev_mode = self.settings.value("devMode", False, type=bool)
+        global DEV_MODE_ENABLED
+        DEV_MODE_ENABLED = self.dev_mode
+
+    # Update the create_menu_bar method to add dev mode option:
+    def create_menu_bar(self):
+        """Create the menu bar"""
+        menu_bar = self.menuBar()
+        
+        # File menu
+        file_menu = menu_bar.addMenu("&File")
+        
+        open_action = QAction("&Open Video", self)
+        open_action.setShortcut(QKeySequence.Open)
+        open_action.triggered.connect(self.open_video)
+        file_menu.addAction(open_action)
+        
+        file_menu.addSeparator()
+        
+        quit_action = QAction("&Quit", self)
+        quit_action.setShortcut(QKeySequence.Quit)
+        quit_action.triggered.connect(self.close)
+        file_menu.addAction(quit_action)
+        
+        # Edit menu
+        edit_menu = menu_bar.addMenu("&Edit")
+        
+        preferences_action = QAction("&Preferences", self)
+        preferences_action.triggered.connect(self.show_preferences)
+        edit_menu.addAction(preferences_action)
+        
+        # Only show dev mode toggle in menu if already in dev mode
+        if self.dev_mode:
+            edit_menu.addSeparator()
+            dev_mode_action = QAction("&Developer Mode", self)
+            dev_mode_action.setCheckable(True)
+            dev_mode_action.setChecked(self.dev_mode)
+            dev_mode_action.triggered.connect(self.toggle_dev_mode)
+            edit_menu.addAction(dev_mode_action)
+        
+        # Help menu
+        help_menu = menu_bar.addMenu("&Help")
+        
+        about_action = QAction("&About", self)
+        about_action.triggered.connect(self.show_about)
+        help_menu.addAction(about_action)
+
+# Update the status bar creation to be simpler in non-dev mode:
+    def create_status_bar(self):
+        """Create the status bar"""
+        status_bar = self.statusBar()
+        
+        if self.dev_mode:
+            # System info label
+            self.system_info_label = QLabel()
+            self.update_system_info()
+            status_bar.addPermanentWidget(self.system_info_label)
+            
+            # GPU info label
+            self.gpu_info_label = QLabel()
+            self.update_gpu_info()
+            status_bar.addPermanentWidget(self.gpu_info_label)
+            
+            # Timer to update system info
+            self.status_timer = QTimer()
+            self.status_timer.timeout.connect(self.update_system_info)
+            self.status_timer.timeout.connect(self.update_gpu_info)
+            self.status_timer.start(5000)  # Update every 5 seconds
+        else:
+            # Simple status for non-dev mode
+            self.status_label = QLabel("Ready")
+            status_bar.addWidget(self.status_label)
+
     def save_settings(self):
         """Save application settings"""
         self.settings.setValue("geometry", self.saveGeometry())

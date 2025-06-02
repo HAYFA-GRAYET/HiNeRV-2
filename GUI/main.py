@@ -54,7 +54,7 @@ CONFIG_FILE = "config.json"
 LOG_FILE = "hinerv_gui.log"
 
 # In main.py, add this after the imports and before the MainWindow class:
-DEV_MODE_ENABLED = True  # Global flag for dev mode
+DEV_MODE_ENABLED = False  # Global flag for dev mode
 
 # In MainWindow.__init__, add after self.setup_logging():
 

@@ -82,53 +82,59 @@ class VideoProcessor(QObject):
             self.logger.error(error_msg, exc_info=True)
             self.error_occurred.emit(error_msg)
     
-    def extract_frames(self, video_path: str, output_dir: str, frame_limit: int) -> None:
-        """Extract frames from video using ffmpeg"""
-        # Prepare ffmpeg command
-        ffmpeg_cmd = [
-            "ffmpeg",
-            "-i", video_path,
-            "-vf", f"select=between(n\\,0\\,{frame_limit-1})",
-            "-vsync", "0",
-            "-q:v", "0",
-            os.path.join(output_dir, "frame_%06d.png")
-        ]
-        
-        self.logger.info(f"Running FFmpeg command: {' '.join(ffmpeg_cmd)}")
-        
-        # Run ffmpeg process
-        self.process = subprocess.Popen(
-            ffmpeg_cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            universal_newlines=True
-        )
-        
-        # Track progress
-        current_frame = 0
-        pattern = re.compile(r'frame=\s*(\d+)')
-        
-        # Read process output
-        for line in iter(self.process.stderr.readline, ""):
-            if self.abort_requested:
-                self.process.terminate()
-                break
+    def extract_frames(self, video_path: str, output_dir: str, frame_limit: Optional[int] = None) -> bool:
+        """Extract frames from video"""
+        try:
+            # Ensure frame_limit is positive
+            if frame_limit is not None and frame_limit <= 0:
+                frame_limit = None
                 
-            # Parse frame number
-            match = pattern.search(line)
-            if match:
-                current_frame = int(match.group(1))
-                progress = min(int(current_frame * 100 / frame_limit), 100)
-                self.progress_updated.emit(progress, f"Extracting frames: {current_frame}/{frame_limit}")
-        
-        # Wait for process to finish
-        self.process.wait()
-        
-        if self.process.returncode != 0 and not self.abort_requested:
-            error_output = self.process.stderr.read()
-            raise Exception(f"FFmpeg failed with code {self.process.returncode}: {error_output}")
-        
-        self.process = None
+            # Build FFmpeg command
+            frame_pattern = os.path.join(output_dir, "frame_%06d.png")
+            if frame_limit:
+                cmd = [
+                    "ffmpeg", "-i", video_path,
+                    "-vf", f"select=between(n\\,0\\,{frame_limit-1})",
+                    "-vsync", "0", "-q:v", "0",
+                    frame_pattern
+                ]
+            else:
+                cmd = [
+                    "ffmpeg", "-i", video_path,
+                    "-vf", "select=between(n\\,0\\,-1)",
+                    "-vsync", "0", "-q:v", "0",
+                    frame_pattern
+                ]
+                
+            # Run FFmpeg command
+            logging.info(f"Running FFmpeg command: {' '.join(cmd)}")
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                universal_newlines=True
+            )
+            
+            # Monitor progress
+            current_frame = 0
+            while True:
+                line = process.stderr.readline()
+                if not line:
+                    break
+                    
+                # Update progress
+                if frame_limit:
+                    progress = min(int(current_frame * 100 / frame_limit), 100)
+                else:
+                    progress = 0
+                current_frame += 1
+                
+            return_code = process.wait()
+            return return_code == 0
+            
+        except Exception as e:
+            logging.error(f"Error extracting frames: {e}")
+            return False
     
     def postprocess_video(self, 
                          compressed_dir: str, 

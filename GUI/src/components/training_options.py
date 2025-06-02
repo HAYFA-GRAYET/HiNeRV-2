@@ -12,6 +12,7 @@ from PySide6.QtCore import Qt, Signal
 from typing import Dict, Any
 import os
 import json
+import logging
 
 
 class TrainingOptionsWidget(QWidget):
@@ -461,10 +462,22 @@ class TrainingOptionsWidget(QWidget):
         # TODO: Implement preset saving dialog
         pass
     
-    def load_preset(self):
-        """Load a preset configuration"""
-        # TODO: Implement preset loading dialog
-        pass
+    def load_preset(self, preset_info: Dict):
+        """Load settings from a model preset"""
+        try:
+            # Get training options from preset
+            options = preset_info.get('training_options', {})
+            
+            # Update widget values
+            for key, value in options.items():
+                if hasattr(self, f"{key}_spin"):
+                    spinbox = getattr(self, f"{key}_spin")
+                    spinbox.setValue(value)
+                elif hasattr(self, f"{key}_check"):
+                    checkbox = getattr(self, f"{key}_check")
+                    checkbox.setChecked(value)
+        except Exception as e:
+            logging.error(f"Error loading preset: {e}")
     
     def update_for_video(self, video_info: Dict):
         """Update options based on video information"""

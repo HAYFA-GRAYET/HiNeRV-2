@@ -390,12 +390,40 @@ class MainWindow(QMainWindow):
             dev_mode_action.triggered.connect(self.toggle_dev_mode)
             edit_menu.addAction(dev_mode_action)
         
-        # Help menu
-        help_menu = menu_bar.addMenu("&Help")
+        # Help label (not a menu)
+        help_label = QLabel("Help")
+        help_label.setStyleSheet("""
+            QLabel {
+                color: #fff;
+                padding: 5px 10px;
+                margin: 0;
+            }
+        """)
+        # Store reference to track clicks
+        self.help_label = help_label
+        menu_bar.setCornerWidget(help_label, Qt.TopRightCorner)
+
+    def mousePressEvent(self, event):
+        """Handle mouse press events for dev mode activation"""
+        super().mousePressEvent(event)
         
-        about_action = QAction("&About", self)
-        about_action.triggered.connect(self.show_about)
-        help_menu.addAction(about_action)
+        # Check if clicking on help label
+        if hasattr(self, 'help_label'):
+            help_pos = self.help_label.mapFromGlobal(event.globalPos())
+            if self.help_label.rect().contains(help_pos):
+                current_time = time.time()
+                
+                # Reset counter if too much time has passed
+                if current_time - self.last_click_time > 2.0:
+                    self.dev_mode_clicks = 0
+                
+                self.last_click_time = current_time
+                self.dev_mode_clicks += 1
+                
+                # Activate dev mode after 5 clicks
+                if self.dev_mode_clicks >= 5:
+                    self.toggle_dev_mode()
+                    self.dev_mode_clicks = 0
 
 # Update the status bar creation to be simpler in non-dev mode:
     def create_status_bar(self):

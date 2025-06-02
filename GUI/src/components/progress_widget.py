@@ -557,83 +557,91 @@ class LogViewerWidget(QWidget):
                 QMessageBox.warning(self, "Error", f"Failed to save logs: {e}")
 
 
-# In ProgressWidget.setup_ui, replace the method:
-def setup_ui(self):
-    """Initialize the progress widget UI"""
-    layout = QVBoxLayout(self)
+class ProgressWidget(QWidget):
+    """Main progress widget combining all progress components"""
     
-    # For non-dev mode, show simplified progress
-    from main import DEV_MODE_ENABLED
+    def __init__(self):
+        super().__init__()
+        self.setup_ui()
+        self.training_started = False
     
-    if not DEV_MODE_ENABLED:
-        # Simple progress bar
-        self.simple_progress_group = QGroupBox("Compression Progress")
-        simple_layout = QVBoxLayout(self.simple_progress_group)
+    # In ProgressWidget.setup_ui, replace the method:
+    def setup_ui(self):
+        """Initialize the progress widget UI"""
+        layout = QVBoxLayout(self)
         
-        self.status_label = QLabel("Waiting to start...")
-        simple_layout.addWidget(self.status_label)
+        # For non-dev mode, show simplified progress
+        from main import DEV_MODE_ENABLED
         
-        self.overall_progress = QProgressBar()
-        simple_layout.addWidget(self.overall_progress)
-        
-        self.time_label = QLabel("Elapsed: 0:00")
-        simple_layout.addWidget(self.time_label)
-        
-        layout.addWidget(self.simple_progress_group)
-        
-        # Hide technical components
-        self.training_progress = TrainingProgressWidget()
-        self.training_progress.setVisible(False)
-        self.system_stats = SystemStatsWidget()
-        self.system_stats.setVisible(False)
-        self.log_viewer = LogViewerWidget()
-        self.log_viewer.setVisible(False)
-    else:
-        # Original implementation for dev mode
-        # Create splitter for resizable panels
-        splitter = QSplitter(Qt.Vertical)
-        layout.addWidget(splitter)
-        
-        # Training progress
-        self.training_progress = TrainingProgressWidget()
-        splitter.addWidget(self.training_progress)
-        
-        # Tab widget for system stats and logs
-        tabs = QTabWidget()
-        
-        # System stats tab
-        self.system_stats = SystemStatsWidget()
-        tabs.addTab(self.system_stats, "System Stats")
-        
-        # Log viewer tab
-        self.log_viewer = LogViewerWidget()
-        tabs.addTab(self.log_viewer, "Training Logs")
-        
-        splitter.addWidget(tabs)
-        
-        # Set splitter proportions
-        splitter.setSizes([400, 300])
+        if not DEV_MODE_ENABLED:
+            # Simple progress bar
+            self.simple_progress_group = QGroupBox("Compression Progress")
+            simple_layout = QVBoxLayout(self.simple_progress_group)
+            
+            self.status_label = QLabel("Waiting to start...")
+            simple_layout.addWidget(self.status_label)
+            
+            self.overall_progress = QProgressBar()
+            simple_layout.addWidget(self.overall_progress)
+            
+            self.time_label = QLabel("Elapsed: 0:00")
+            simple_layout.addWidget(self.time_label)
+            
+            layout.addWidget(self.simple_progress_group)
+            
+            # Hide technical components
+            self.training_progress = TrainingProgressWidget()
+            self.training_progress.setVisible(False)
+            self.system_stats = SystemStatsWidget()
+            self.system_stats.setVisible(False)
+            self.log_viewer = LogViewerWidget()
+            self.log_viewer.setVisible(False)
+        else:
+            # Original implementation for dev mode
+            # Create splitter for resizable panels
+            splitter = QSplitter(Qt.Vertical)
+            layout.addWidget(splitter)
+            
+            # Training progress
+            self.training_progress = TrainingProgressWidget()
+            splitter.addWidget(self.training_progress)
+            
+            # Tab widget for system stats and logs
+            tabs = QTabWidget()
+            
+            # System stats tab
+            self.system_stats = SystemStatsWidget()
+            tabs.addTab(self.system_stats, "System Stats")
+            
+            # Log viewer tab
+            self.log_viewer = LogViewerWidget()
+            tabs.addTab(self.log_viewer, "Training Logs")
+            
+            splitter.addWidget(tabs)
+            
+            # Set splitter proportions
+            splitter.setSizes([400, 300])
 
 # Add this method to update simple progress:
-def update_simple_progress(self, progress_data: Dict):
-    """Update simple progress display for non-dev mode"""
-    if hasattr(self, 'simple_progress_group'):
-        # Update status
-        if 'status' in progress_data:
-            self.status_label.setText(progress_data['status'])
-        
-        # Update progress bar
-        if 'progress' in progress_data:
-            self.overall_progress.setValue(int(progress_data['progress'] * 100))
-        
-        # Update time
-        if 'elapsed_time' in progress_data:
-            elapsed = progress_data['elapsed_time']
-            hours = int(elapsed // 3600)
-            minutes = int((elapsed % 3600) // 60)
-            seconds = int(elapsed % 60)
-            self.time_label.setText(f"Elapsed: {hours}:{minutes:02d}:{seconds:02d}")
+    def update_simple_progress(self, progress_data: Dict):
+        """Update simple progress display for non-dev mode"""
+        if hasattr(self, 'simple_progress_group'):
+            # Update status
+            if 'status' in progress_data:
+                self.status_label.setText(progress_data['status'])
             
+            # Update progress bar
+            if 'progress' in progress_data:
+                self.overall_progress.setValue(int(progress_data['progress'] * 100))
+            
+            # Update time
+            if 'elapsed_time' in progress_data:
+                elapsed = progress_data['elapsed_time']
+                hours = int(elapsed // 3600)
+                minutes = int((elapsed % 3600) // 60)
+                seconds = int(elapsed % 60)
+                self.time_label.setText(f"Elapsed: {hours}:{minutes:02d}:{seconds:02d}")
+        
     def update_progress(self, progress_data: Dict):
         """Update training progress"""
         self.training_progress.update_progress(progress_data)

@@ -10,6 +10,7 @@ import json
 import logging
 from pathlib import Path
 from datetime import datetime
+import time
 from typing import Dict, List, Optional
 
 from PySide6.QtWidgets import (
@@ -56,9 +57,7 @@ LOG_FILE = "hinerv_gui.log"
 DEV_MODE_ENABLED = False  # Global flag for dev mode
 
 # In MainWindow.__init__, add after self.setup_logging():
-self.dev_mode = DEV_MODE_ENABLED
-self.dev_mode_clicks = 0  # For secret dev mode activation
-self.last_click_time = 0
+
 
 # Replace the create_left_panel method:
 def create_left_panel(self) -> QWidget:
@@ -304,8 +303,11 @@ class MainWindow(QMainWindow):
         
         # Set up logging
         self.setup_logging()
+        self.dev_mode = DEV_MODE_ENABLED
+        self.dev_mode_clicks = 0  # For secret dev mode activation
+        self.last_click_time = 0
         self.logger = logging.getLogger(__name__)
-        
+
         # Initialize UI
         self.setup_ui()
         self.system_monitor = SystemMonitor()

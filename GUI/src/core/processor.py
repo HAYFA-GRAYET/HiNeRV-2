@@ -188,7 +188,9 @@ class HiNeRVProcessor(QThread):
         
         # Extract frames from video
         success = self.video_processor.extract_frames(
-            video_path, frames_dir, max_frames=max_frames
+            video_path=video_path,
+            output_dir=frames_dir,
+            frame_limit=max_frames  # Changed from max_frames to frame_limit
         )
         
         if not success:

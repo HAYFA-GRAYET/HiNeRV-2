@@ -284,18 +284,13 @@ def get_optimal_batch_size(video_height: int, video_width: int, max_vram_mb: int
         return default_batch_size
 
 
-def format_duration(seconds: float) -> str:
-    """
-    Format duration in seconds to human-readable format.
-    
-    Args:
-        seconds: Duration in seconds
+def format_duration(seconds: Optional[float]) -> str:
+    """Format duration in seconds to human readable string"""
+    if seconds is None:
+        return "Unknown"
         
-    Returns:
-        Formatted duration string
-    """
     if seconds < 0:
-        return "N/A"
+        return "Invalid duration"
     
     td = timedelta(seconds=seconds)
     

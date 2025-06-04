@@ -303,12 +303,15 @@ class HiNeRVProcessor(QThread):
         self.config['batch_models'] = batch_models
         self._save_config()
     def _build_training_args(self, frames_dir: str, model_dir: str, 
-                        training_options: Dict, model_preset: Dict,
-                        resource_limits: Dict) -> List[str]:
+                       training_options: Dict, model_preset: Dict,
+                       resource_limits: Dict) -> List[str]:
         """Build command line arguments for HiNeRV training"""
         # Get the HiNeRV root directory (parent of GUI folder)
         gui_dir = Path(__file__).parent.parent.parent
         hinerv_root = gui_dir.parent
+        
+        # Change to HiNeRV root directory for execution
+        os.chdir(hinerv_root)
         
         # For HiNeRV, we need to pass the parent directory as dataset
         # and the subdirectory name as dataset-name
@@ -322,73 +325,36 @@ class HiNeRVProcessor(QThread):
             "--dynamo_backend=inductor",
             "hinerv_main.py",
             "--dataset", dataset_parent,  # Parent directory
-            "--dataset-name", dataset_name,  # Subdirectory name (should be "frames")
+            "--dataset-name", dataset_name,  # Subdirectory name
             "--output", model_dir,
-            "--model", "HiNeRV",
-            "--block-type", model_preset.get('block_type', 'convnext'),
         ]
         
-        # Add model preset parameters
-        model_params = [
-            "--channels", str(model_preset.get('channels', 280)),
-            "--channels-reduce", str(model_preset.get('channels_reduce', 2.0)),
-            "--depths", "3", "3", "3", "1",
-            "--exps", "4.", "4.", "4.", "1.",
-            "--stem-kernels", "3",
-            "--kernels", "3", "3", "3", "3",
-            "--scales-t", "1", "1", "1", "1",
-            "--scales-hw", "5", "4", "2", "2",
-            "--stem-paddings", "-1", "-1", "-1",
-            "--paddings", "-1", "-1", "-1",
-            "--base-size", "-1", "-1", "-1",
-            "--base-grid-size", "-1", "-1", "-1", "8",
-            "--base-grid-level", "2",
-            "--base-grid-level-scale", "2.", "1.", "1.", "0.5",
-            "--enc-type", "normalized+temp_local_grid",
-            "--enc-grid-size", "-1", "16",
-            "--enc-grid-level", "3",
-            "--enc-grid-level-scale", "2.", "0.5",
-            "--enc-grid-depth-scale", "1.", "0.5",
-            "--upsample-type", "trilinear",
-            "--upsample-config", "matmul-th-w",
-        ]
-        args.extend(model_params)
+        # Read config files and append their contents
+        if 'config' in model_preset and 'file_path' in model_preset:
+            config_path = model_preset['file_path']
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    config_content = f.read().strip()
+                    # Split by whitespace and add each argument
+                    config_args = config_content.split()
+                    args.extend(config_args)
         
-        # Add training parameters
-        training_params = [
-            "--loss", "0.7", "l1", "0.3", "ms-ssim_5x5",
-            "--train-metric", "psnr",
-            "--eval-metric", "psnr", "ms-ssim",
-            "--crop-size", "-1", "-1",
-            "--input-size", "1080", "1920",  # You might want to get this from video_info
-            "--patch-size", "1", "120", "120",
-            "--cached", "patch",
-            "--epochs", str(training_options.get('epochs', 30)),
-            "--eval-epochs", "10",
-            "--log-epochs", "-1",
-            "--warmup-epochs", "10",
-            "--prune-epochs", str(training_options.get('prune_epochs', 30)),
-            "--prune-warmup-epochs", "0",
-            "--prune-ratio", "0.15",
-            "--prune-weight", "0.5",
-            "--quant-epochs", str(training_options.get('quant_epochs', 30)),
-            "--quant-warmup-epochs", "0",
-            "--quant-lr-scale", "0.1",
-            "--quant-level", "8", "7", "6",
-            "--quant-noise", "0.9",
-            "--opt", "adam",
-            "--lr", "2e-3",
-            "--warmup-lr", "2e-5",
-            "--min-lr", "2e-5",
-            "--max-norm", "1.0",
-            "--auto-lr-scaling", "true",
-            "--batch-size", str(resource_limits.get('batch_size', 1)),  # Reduced default
-            "--eval-batch-size", "1",
-            "--grad-accum", str(resource_limits.get('gradient_accumulation', 1)),
+        # Read training config file
+        training_config_path = os.path.join(hinerv_root, "cfgs/train/hinerv_1920x1080.txt")
+        if os.path.exists(training_config_path):
+            with open(training_config_path, 'r') as f:
+                train_config_content = f.read().strip()
+                train_args = train_config_content.split()
+                args.extend(train_args)
+        
+        # Override with specific training options from GUI
+        args.extend([
+            "--batch-size", str(training_options.get('batch-size', 2)),
+            "--eval-batch-size", str(training_options.get('eval-batch-size', 1)),
+            "--grad-accum", "1",
             "--log-eval", "true",
             "--seed", "0"
-        ]
-        args.extend(training_params)
+        ])
         
         return args
     
@@ -494,6 +460,10 @@ class HiNeRVProcessor(QThread):
     def _parse_progress_line(self, line: str):
         """Parse a line of output from the training process"""
         try:
+            # Always send line to log viewer (for both dev and normal modes)
+            if line.strip():  # Only send non-empty lines
+                self.progress_updated.emit({'log_message': line.strip()})
+            
             # Check if in dev mode
             try:
                 from main import DEV_MODE_ENABLED
@@ -502,52 +472,9 @@ class HiNeRVProcessor(QThread):
 
             if not DEV_MODE_ENABLED:
                 # Simplified progress for non-dev mode
-                if "Start main training for" in line:
-                    # Extract total epochs
-                    import re
-                    match = re.search(r'for (\d+) epochs', line)
-                    if match:
-                        total_epochs = int(match.group(1))
-                        self.progress_data['total_epochs'] = total_epochs
-                        self.progress_updated.emit({
-                            'status': f'Starting training for {total_epochs} epochs...',
-                            'progress': 0.0,
-                            'elapsed_time': time.time() - self.start_time
-                        })
-                elif "Start training for" in line:
-                    # Extract total epochs from overall training
-                    import re
-                    match = re.search(r'for (\d+) epochs', line)
-                    if match:
-                        total_epochs = int(match.group(1))
-                        self.progress_updated.emit({
-                            'status': f'Preparing to train for {total_epochs} total epochs...',
-                            'elapsed_time': time.time() - self.start_time
-                        })
-                elif "Create training dataset" in line:
-                    self.progress_updated.emit({
-                        'status': "Creating training dataset...",
-                        'elapsed_time': time.time() - self.start_time
-                    })
-                elif "Create model:" in line:
-                    self.progress_updated.emit({
-                        'status': "Initializing model architecture...",
-                        'elapsed_time': time.time() - self.start_time
-                    })
-                elif "Number of parameters:" in line:
-                    self.progress_updated.emit({
-                        'status': "Model initialized, calculating parameters...",
-                        'elapsed_time': time.time() - self.start_time
-                    })
-                elif "Flops profiler" in line:
-                    self.progress_updated.emit({
-                        'status': "Profiling model performance...",
-                        'elapsed_time': time.time() - self.start_time
-                    })
-                elif "Epoch" in line and "/" in line:
+                if "Epoch" in line and "/" in line:
                     # Parse epoch information
                     import re
-                    # Match patterns like "Epoch: 1/30" or "Epoch 1/30"
                     epoch_match = re.search(r'Epoch[:\s]+(\d+)[/\s]+(\d+)', line)
                     if epoch_match:
                         current_epoch = int(epoch_match.group(1))
@@ -559,6 +486,17 @@ class HiNeRVProcessor(QThread):
                             'status': f"Training model... Epoch {current_epoch}/{total_epochs}",
                             'elapsed_time': time.time() - self.start_time
                         })
+                        return
+                elif "Create training dataset" in line:
+                    self.progress_updated.emit({
+                        'status': "Creating training dataset...",
+                        'elapsed_time': time.time() - self.start_time
+                    })
+                elif "Model:" in line:
+                    self.progress_updated.emit({
+                        'status': "Initializing model...",
+                        'elapsed_time': time.time() - self.start_time
+                    })
             else:
                 # Original detailed parsing for dev mode
                 if "Epoch:" in line:
@@ -577,11 +515,6 @@ class HiNeRVProcessor(QThread):
                         elif part == "MS-SSIM:":
                             ms_ssim = float(parts[i+1])
                             self.progress_data['ms_ssim_history'].append(ms_ssim)
-                    
-                    # Calculate progress
-                    if self.progress_data['total_epochs'] > 0:
-                        progress = self.progress_data['epochs_completed'] / self.progress_data['total_epochs']
-                        self.progress_data['progress'] = progress
                     
                     # Calculate ETA
                     if self.start_time and self.progress_data['epochs_completed'] > 0:

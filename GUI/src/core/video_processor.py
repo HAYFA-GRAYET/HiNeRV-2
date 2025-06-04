@@ -64,7 +64,7 @@ class VideoProcessor(QObject):
             video_info['original_total_frames'] = total_frames
             
             # Extract frames using ffmpeg
-            self.extract_frames(video_path, frames_dir, frame_limit)
+            self._extract_frames(video_path, frames_dir, frame_limit)
             
             # Save video info
             video_info['frames_dir'] = frames_dir

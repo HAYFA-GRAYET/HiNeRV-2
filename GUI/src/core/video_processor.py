@@ -85,13 +85,9 @@ class VideoProcessor(QObject):
     def extract_frames(self, video_path: str, output_dir: str, frame_limit: Optional[int] = None) -> bool:
         """Extract frames from video in HiNeRV expected format"""
         try:
-            # HiNeRV expects frames in a subdirectory structure
-            # Create the structure: output_dir/frames/
-            frames_subdir = os.path.join(output_dir, "frames")
-            os.makedirs(frames_subdir, exist_ok=True)
-            
-            # Build FFmpeg command
-            frame_pattern = os.path.join(frames_subdir, "%06d.png")  # HiNeRV expects this naming
+            # HiNeRV expects frames directly in the output_dir, not in a subdirectory
+            # The frame pattern should be directly in output_dir
+            frame_pattern = os.path.join(output_dir, "%06d.png")  # HiNeRV expects this naming
             
             if frame_limit and frame_limit > 0:
                 # Extract specific number of frames

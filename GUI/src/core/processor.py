@@ -70,7 +70,7 @@ class HiNeRVProcessor(QThread):
             self.start_time = time.time()
             self._verify_paths()
 
-            
+
             # Emit initial status
             self.status_updated.emit("Initializing...")
             
@@ -306,8 +306,8 @@ class HiNeRVProcessor(QThread):
         self.config['batch_models'] = batch_models
         self._save_config()
     def _build_training_args(self, frames_dir: str, model_dir: str, 
-                       training_options: Dict, model_preset: Dict,
-                       resource_limits: Dict) -> List[str]:
+                        training_options: Dict, model_preset: Dict,
+                        resource_limits: Dict) -> List[str]:
         """Build command line arguments for HiNeRV training"""
         # Get the HiNeRV root directory (parent of GUI folder)
         gui_dir = Path(__file__).parent.parent.parent
@@ -316,14 +316,19 @@ class HiNeRVProcessor(QThread):
         # Change to HiNeRV root directory for execution
         os.chdir(hinerv_root)
         
+        # For HiNeRV, we need to pass the parent directory as dataset
+        # and the subdirectory name as dataset-name
+        dataset_parent = os.path.dirname(frames_dir)
+        dataset_name = os.path.basename(frames_dir)
+        
         # Base arguments
         args = [
             "accelerate", "launch",
             "--mixed_precision=fp16",
             "--dynamo_backend=inductor",
-            "hinerv_main.py",  # Changed from hinerv_train.py
-            "--dataset", frames_dir,
-            "--dataset-name", "frames",  # Using "frames" as dataset name
+            "hinerv_main.py",
+            "--dataset", dataset_parent,  # Parent directory
+            "--dataset-name", dataset_name,  # Subdirectory name
             "--output", model_dir,
         ]
         

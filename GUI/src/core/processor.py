@@ -382,30 +382,62 @@ class HiNeRVProcessor(QThread):
         gui_dir = Path(__file__).parent.parent.parent
         hinerv_root = gui_dir.parent
         
+        # Set up environment to fix library issues
+        env = os.environ.copy()
+        # Force Python to use unbuffered output
+        env['PYTHONUNBUFFERED'] = '1'
+        
+        # Add conda lib path to LD_LIBRARY_PATH if needed
+        conda_env_path = os.environ.get('CONDA_PREFIX', '')
+        if conda_env_path:
+            lib_path = os.path.join(conda_env_path, 'lib')
+            if 'LD_LIBRARY_PATH' in env:
+                env['LD_LIBRARY_PATH'] = f"{lib_path}:{env['LD_LIBRARY_PATH']}"
+            else:
+                env['LD_LIBRARY_PATH'] = lib_path
+        
         # Start process
         self.logger.info(f"Starting training process with args: {' '.join(args)}")
         self.logger.info(f"Working directory: {hinerv_root}")
         
         try:
             with open(log_file, 'w') as log:
+                # Use Popen with proper buffering settings
                 process = subprocess.Popen(
                     args,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     universal_newlines=True,
-                    bufsize=1,
-                    cwd=str(hinerv_root)  # Set working directory to HiNeRV root
+                    bufsize=1,  # Line buffered
+                    cwd=str(hinerv_root),
+                    env=env
                 )
                 
+                # Update status to show we're initializing
+                self.status_updated.emit("Initializing training environment...")
+                self.progress_updated.emit({
+                    'status': 'Initializing training environment...',
+                    'progress': 0.0,
+                    'elapsed_time': time.time() - self.start_time
+                })
+                
                 # Monitor process output
-                for line in process.stdout:
-                    # Write to log file
-                    log.write(line)
-                    log.flush()
-                    
-                    # Parse progress information
-                    self._parse_progress_line(line)
-                    
+                while True:
+                    line = process.stdout.readline()
+                    if not line and process.poll() is not None:
+                        break
+                        
+                    if line:
+                        # Write to log file
+                        log.write(line)
+                        log.flush()
+                        
+                        # Log the line for debugging
+                        self.logger.debug(f"Process output: {line.strip()}")
+                        
+                        # Parse progress information
+                        self._parse_progress_line(line.strip())
+                        
                     # Check if paused
                     self._check_pause()
                     
@@ -415,7 +447,7 @@ class HiNeRVProcessor(QThread):
                         break
                 
                 # Wait for process to finish
-                return_code = process.wait()
+                return_code = process.poll()
                 
                 if return_code != 0 and self.is_running:
                     # Read the log file to get error details
@@ -439,61 +471,109 @@ class HiNeRVProcessor(QThread):
 
             if not DEV_MODE_ENABLED:
                 # Simplified progress for non-dev mode
+                if "Start main training for" in line:
+                    # Extract total epochs
+                    import re
+                    match = re.search(r'for (\d+) epochs', line)
+                    if match:
+                        total_epochs = int(match.group(1))
+                        self.progress_data['total_epochs'] = total_epochs
+                        self.progress_updated.emit({
+                            'status': f'Starting training for {total_epochs} epochs...',
+                            'progress': 0.0,
+                            'elapsed_time': time.time() - self.start_time
+                        })
+                elif "Start training for" in line:
+                    # Extract total epochs from overall training
+                    import re
+                    match = re.search(r'for (\d+) epochs', line)
+                    if match:
+                        total_epochs = int(match.group(1))
+                        self.progress_updated.emit({
+                            'status': f'Preparing to train for {total_epochs} total epochs...',
+                            'elapsed_time': time.time() - self.start_time
+                        })
+                elif "Create training dataset" in line:
+                    self.progress_updated.emit({
+                        'status': "Creating training dataset...",
+                        'elapsed_time': time.time() - self.start_time
+                    })
+                elif "Create model:" in line:
+                    self.progress_updated.emit({
+                        'status': "Initializing model architecture...",
+                        'elapsed_time': time.time() - self.start_time
+                    })
+                elif "Number of parameters:" in line:
+                    self.progress_updated.emit({
+                        'status': "Model initialized, calculating parameters...",
+                        'elapsed_time': time.time() - self.start_time
+                    })
+                elif "Flops profiler" in line:
+                    self.progress_updated.emit({
+                        'status': "Profiling model performance...",
+                        'elapsed_time': time.time() - self.start_time
+                    })
+                elif "Epoch" in line and "/" in line:
+                    # Parse epoch information
+                    import re
+                    # Match patterns like "Epoch: 1/30" or "Epoch 1/30"
+                    epoch_match = re.search(r'Epoch[:\s]+(\d+)[/\s]+(\d+)', line)
+                    if epoch_match:
+                        current_epoch = int(epoch_match.group(1))
+                        total_epochs = int(epoch_match.group(2))
+                        progress = current_epoch / total_epochs if total_epochs > 0 else 0
+                        
+                        self.progress_updated.emit({
+                            'progress': progress,
+                            'status': f"Training model... Epoch {current_epoch}/{total_epochs}",
+                            'elapsed_time': time.time() - self.start_time
+                        })
+            else:
+                # Original detailed parsing for dev mode
                 if "Epoch:" in line:
                     parts = line.split()
                     for i, part in enumerate(parts):
                         if part == "Epoch:":
                             epoch = int(parts[i+1].strip(","))
-                            total_epochs = self.progress_data['total_epochs']
-                            progress = epoch / total_epochs if total_epochs > 0 else 0
-                            
-                            self.progress_updated.emit({
-                                'progress': progress,
-                                'status': f"Compressing video... {int(progress * 100)}%",
-                                'elapsed_time': time.time() - self.start_time
-                            })
-                            return
-            
-            # Original detailed progress parsing for dev mode
-            if "Epoch:" in line:
-                parts = line.split()
-                for i, part in enumerate(parts):
-                    if part == "Epoch:":
-                        epoch = int(parts[i+1].strip(","))
-                        self.progress_data['epochs_completed'] = epoch
-                    elif part == "Loss:":
-                        loss = float(parts[i+1])
-                        self.progress_data['current_loss'] = loss
-                        self.progress_data['loss_history'].append(loss)
-                    elif part == "PSNR:":
-                        psnr = float(parts[i+1])
-                        self.progress_data['psnr_history'].append(psnr)
-                    elif part == "MS-SSIM:":
-                        ms_ssim = float(parts[i+1])
-                        self.progress_data['ms_ssim_history'].append(ms_ssim)
-                
-                # Calculate ETA
-                if self.start_time and self.progress_data['epochs_completed'] > 0:
-                    elapsed = time.time() - self.start_time
-                    total_epochs = self.progress_data['total_epochs']
-                    completed_epochs = self.progress_data['epochs_completed']
+                            self.progress_data['epochs_completed'] = epoch
+                        elif part == "Loss:":
+                            loss = float(parts[i+1])
+                            self.progress_data['current_loss'] = loss
+                            self.progress_data['loss_history'].append(loss)
+                        elif part == "PSNR:":
+                            psnr = float(parts[i+1])
+                            self.progress_data['psnr_history'].append(psnr)
+                        elif part == "MS-SSIM:":
+                            ms_ssim = float(parts[i+1])
+                            self.progress_data['ms_ssim_history'].append(ms_ssim)
                     
-                    if completed_epochs > 0:
-                        time_per_epoch = elapsed / completed_epochs
-                        remaining_epochs = total_epochs - completed_epochs
-                        eta_seconds = time_per_epoch * remaining_epochs
+                    # Calculate progress
+                    if self.progress_data['total_epochs'] > 0:
+                        progress = self.progress_data['epochs_completed'] / self.progress_data['total_epochs']
+                        self.progress_data['progress'] = progress
+                    
+                    # Calculate ETA
+                    if self.start_time and self.progress_data['epochs_completed'] > 0:
+                        elapsed = time.time() - self.start_time
+                        total_epochs = self.progress_data['total_epochs']
+                        completed_epochs = self.progress_data['epochs_completed']
                         
-                        eta = datetime.now() + timedelta(seconds=eta_seconds)
-                        self.progress_data['eta'] = eta.strftime("%H:%M:%S")
-                
-                # Emit progress update
-                self.progress_updated.emit(self.progress_data)
-                
-                # Update status
-                self.status_updated.emit(
-                    f"Training - Epoch {self.progress_data['epochs_completed']}/{self.progress_data['total_epochs']}, "
-                    f"Loss: {self.progress_data['current_loss']:.4f}"
-                )
+                        if completed_epochs > 0:
+                            time_per_epoch = elapsed / completed_epochs
+                            remaining_epochs = total_epochs - completed_epochs
+                            eta_seconds = time_per_epoch * remaining_epochs
+                            
+                            eta = datetime.now() + timedelta(seconds=eta_seconds)
+                            self.progress_data['eta'] = eta.strftime("%H:%M:%S")
+                    
+                    # Emit progress update
+                    self.progress_updated.emit(self.progress_data)
+                    
+                    # Update status
+                    self.status_updated.emit(
+                        f"Training - Epoch {self.progress_data['epochs_completed']}/{self.progress_data['total_epochs']}, "
+                        f"Loss: {self.progress_data['current_loss']:.4f}"
+                    )
         except Exception as e:
             # Just log errors in parsing, don't break the process
             self.logger.error(f"Error parsing progress line: {str(e)}")

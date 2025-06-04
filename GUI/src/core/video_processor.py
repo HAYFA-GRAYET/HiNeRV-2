@@ -82,9 +82,9 @@ class VideoProcessor(QObject):
             self.logger.error(error_msg, exc_info=True)
             self.error_occurred.emit(error_msg)
     
-    def _extract_frames(self, video_path: str, output_dir: str) -> str:
+    def _extract_frames(self, video_path: str, output_dir: str, frame_limit: Optional[int] = None) -> str:
         """Extract frames from video"""
-        frames_dir = os.path.join(output_dir, "frames")
+        frames_dir = output_dir
         os.makedirs(frames_dir, exist_ok=True)
         
         # Check if frames already exist
@@ -93,16 +93,21 @@ class VideoProcessor(QObject):
             self.logger.info(f"Found {len(existing_frames)} existing frames, skipping extraction")
             return frames_dir
         
-        # Extract frames using FFmpeg
+        # Build FFmpeg command
         cmd = [
             'ffmpeg',
             '-i', video_path,
             '-q:v', '0',  # Best quality
-            os.path.join(frames_dir, '%06d.png')
         ]
         
+        # Add frame limit if specified
+        if frame_limit and frame_limit > 0:
+            cmd.extend(['-frames:v', str(frame_limit)])
+        
+        # Add output pattern
+        cmd.append(os.path.join(frames_dir, '%06d.png'))
+        
         self.logger.info(f"Running FFmpeg command: {' '.join(cmd)}")
-        self.status_updated.emit("Extracting frames from video...")
         
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
@@ -114,7 +119,7 @@ class VideoProcessor(QObject):
             raise RuntimeError("No frames were extracted from the video")
         
         self.logger.info(f"Successfully extracted {len(extracted_frames)} frames")
-        return frames_dir  # Return the frames directory path
+        return frames_dir
     
     def postprocess_video(self, 
                          compressed_dir: str, 

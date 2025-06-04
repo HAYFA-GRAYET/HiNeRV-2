@@ -165,7 +165,7 @@ class HiNeRVProcessor(QThread):
         if 'frame_count' not in video_info:
             # Calculate frame count from duration and fps
             fps = video_info.get('fps', 30)  # Default to 30 fps if not present
-            duration = video_info.get('duration', 0)
+            duration = video_info.get('duration_secs', 0)
             video_info['frame_count'] = int(duration * fps)
         
         # Determine frames to extract
@@ -188,18 +188,15 @@ class HiNeRVProcessor(QThread):
             max_frames = min(max_frames, 5)
             self.progress_data['total_frames'] = max_frames
         
-        # Extract frames from video
-        success = self.video_processor._extract_frames(
+        # Extract frames from video - pass frames_dir and frame_limit
+        frames_path = self.video_processor._extract_frames(
             video_path=video_path,
             output_dir=frames_dir,
-            frame_limit=max_frames  # Changed from max_frames to frame_limit
+            frame_limit=max_frames
         )
         
-        if not success:
-            raise RuntimeError("Failed to extract frames from video")
-        
         # Update config with frame information
-        self.config['frames_dir'] = frames_dir
+        self.config['frames_dir'] = frames_path
         self.config['frame_count'] = max_frames
         self.config['video_info'] = video_info
         
@@ -313,9 +310,6 @@ class HiNeRVProcessor(QThread):
         gui_dir = Path(__file__).parent.parent.parent
         hinerv_root = gui_dir.parent
         
-        # Change to HiNeRV root directory for execution
-        os.chdir(hinerv_root)
-        
         # For HiNeRV, we need to pass the parent directory as dataset
         # and the subdirectory name as dataset-name
         dataset_parent = os.path.dirname(frames_dir)
@@ -328,36 +322,73 @@ class HiNeRVProcessor(QThread):
             "--dynamo_backend=inductor",
             "hinerv_main.py",
             "--dataset", dataset_parent,  # Parent directory
-            "--dataset-name", dataset_name,  # Subdirectory name
+            "--dataset-name", dataset_name,  # Subdirectory name (should be "frames")
             "--output", model_dir,
+            "--model", "HiNeRV",
+            "--block-type", model_preset.get('block_type', 'convnext'),
         ]
         
-        # Read config files and append their contents
-        if 'config' in model_preset and 'file_path' in model_preset:
-            config_path = model_preset['file_path']
-            if os.path.exists(config_path):
-                with open(config_path, 'r') as f:
-                    config_content = f.read().strip()
-                    # Split by whitespace and add each argument
-                    config_args = config_content.split()
-                    args.extend(config_args)
+        # Add model preset parameters
+        model_params = [
+            "--channels", str(model_preset.get('channels', 280)),
+            "--channels-reduce", str(model_preset.get('channels_reduce', 2.0)),
+            "--depths", "3", "3", "3", "1",
+            "--exps", "4.", "4.", "4.", "1.",
+            "--stem-kernels", "3",
+            "--kernels", "3", "3", "3", "3",
+            "--scales-t", "1", "1", "1", "1",
+            "--scales-hw", "5", "4", "2", "2",
+            "--stem-paddings", "-1", "-1", "-1",
+            "--paddings", "-1", "-1", "-1",
+            "--base-size", "-1", "-1", "-1",
+            "--base-grid-size", "-1", "-1", "-1", "8",
+            "--base-grid-level", "2",
+            "--base-grid-level-scale", "2.", "1.", "1.", "0.5",
+            "--enc-type", "normalized+temp_local_grid",
+            "--enc-grid-size", "-1", "16",
+            "--enc-grid-level", "3",
+            "--enc-grid-level-scale", "2.", "0.5",
+            "--enc-grid-depth-scale", "1.", "0.5",
+            "--upsample-type", "trilinear",
+            "--upsample-config", "matmul-th-w",
+        ]
+        args.extend(model_params)
         
-        # Read training config file
-        training_config_path = os.path.join(hinerv_root, "cfgs/train/hinerv_1920x1080.txt")
-        if os.path.exists(training_config_path):
-            with open(training_config_path, 'r') as f:
-                train_config_content = f.read().strip()
-                train_args = train_config_content.split()
-                args.extend(train_args)
-        
-        # Override with specific training options from GUI
-        args.extend([
-            "--batch-size", str(training_options.get('batch-size', 2)),
-            "--eval-batch-size", str(training_options.get('eval-batch-size', 1)),
-            "--grad-accum", "1",
+        # Add training parameters
+        training_params = [
+            "--loss", "0.7", "l1", "0.3", "ms-ssim_5x5",
+            "--train-metric", "psnr",
+            "--eval-metric", "psnr", "ms-ssim",
+            "--crop-size", "-1", "-1",
+            "--input-size", "1080", "1920",  # You might want to get this from video_info
+            "--patch-size", "1", "120", "120",
+            "--cached", "patch",
+            "--epochs", str(training_options.get('epochs', 30)),
+            "--eval-epochs", "10",
+            "--log-epochs", "-1",
+            "--warmup-epochs", "10",
+            "--prune-epochs", str(training_options.get('prune_epochs', 30)),
+            "--prune-warmup-epochs", "0",
+            "--prune-ratio", "0.15",
+            "--prune-weight", "0.5",
+            "--quant-epochs", str(training_options.get('quant_epochs', 30)),
+            "--quant-warmup-epochs", "0",
+            "--quant-lr-scale", "0.1",
+            "--quant-level", "8", "7", "6",
+            "--quant-noise", "0.9",
+            "--opt", "adam",
+            "--lr", "2e-3",
+            "--warmup-lr", "2e-5",
+            "--min-lr", "2e-5",
+            "--max-norm", "1.0",
+            "--auto-lr-scaling", "true",
+            "--batch-size", str(resource_limits.get('batch_size', 1)),  # Reduced default
+            "--eval-batch-size", "1",
+            "--grad-accum", str(resource_limits.get('gradient_accumulation', 1)),
             "--log-eval", "true",
             "--seed", "0"
-        ])
+        ]
+        args.extend(training_params)
         
         return args
     

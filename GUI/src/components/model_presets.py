@@ -81,8 +81,11 @@ class ModelPresetsWidget(QWidget):
     def load_presets(self):
         """Load available model presets"""
         try:
-            # Find all preset files
-            models_dir = Path("../cfgs/models")
+            # Get the HiNeRV root directory
+            gui_dir = Path(__file__).parent.parent.parent
+            hinerv_root = gui_dir.parent
+            models_dir = hinerv_root / "cfgs" / "models"
+            
             print(f"Looking for model presets in: {models_dir}")
             if not models_dir.exists():
                 self.logger.warning(f"Models directory not found: {models_dir}")
@@ -121,7 +124,7 @@ class ModelPresetsWidget(QWidget):
             
         except Exception as e:
             self.logger.error(f"Error loading presets: {e}")
-    
+        
     def get_preset_name(self, file_path: Path) -> str:
         """Extract a user-friendly name from preset file"""
         # Remove file extension and format name

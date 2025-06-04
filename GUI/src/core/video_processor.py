@@ -83,10 +83,15 @@ class VideoProcessor(QObject):
             self.error_occurred.emit(error_msg)
     
     def extract_frames(self, video_path: str, output_dir: str, frame_limit: Optional[int] = None) -> bool:
-        """Extract frames from video"""
+        """Extract frames from video in HiNeRV expected format"""
         try:
+            # HiNeRV expects frames in a subdirectory structure
+            # Create the structure: output_dir/frames/
+            frames_subdir = os.path.join(output_dir, "frames")
+            os.makedirs(frames_subdir, exist_ok=True)
+            
             # Build FFmpeg command
-            frame_pattern = os.path.join(output_dir, "frame_%06d.png")
+            frame_pattern = os.path.join(frames_subdir, "%06d.png")  # HiNeRV expects this naming
             
             if frame_limit and frame_limit > 0:
                 # Extract specific number of frames
@@ -113,7 +118,11 @@ class VideoProcessor(QObject):
                 universal_newlines=True
             )
             
-            return process.returncode == 0
+            if process.returncode != 0:
+                logging.error(f"FFmpeg error: {process.stderr}")
+                return False
+                
+            return True
             
         except Exception as e:
             logging.error(f"Error extracting frames: {e}")

@@ -68,6 +68,8 @@ class HiNeRVProcessor(QThread):
         try:
             self.is_running = True
             self.start_time = time.time()
+            self._verify_paths()
+
             
             # Emit initial status
             self.status_updated.emit("Initializing...")
@@ -237,7 +239,7 @@ class HiNeRVProcessor(QThread):
             self._train_multiple_batches(frames_dir, model_dir, training_options, model_preset, resource_limits, total_frames, max_frames_per_batch)
         
         self.status_updated.emit("Training complete")
-        
+
     def _train_single_batch(self, frames_dir, model_dir, training_options, model_preset, resource_limits):
         """Train on a single batch of frames"""
         args = self._build_training_args(frames_dir, model_dir, training_options, model_preset, resource_limits)
@@ -304,49 +306,53 @@ class HiNeRVProcessor(QThread):
         self.config['batch_models'] = batch_models
         self._save_config()
     def _build_training_args(self, frames_dir: str, model_dir: str, 
-                           training_options: Dict, model_preset: Dict,
-                           resource_limits: Dict) -> List[str]:
+                       training_options: Dict, model_preset: Dict,
+                       resource_limits: Dict) -> List[str]:
         """Build command line arguments for HiNeRV training"""
+        # Get the HiNeRV root directory (parent of GUI folder)
+        gui_dir = Path(__file__).parent.parent.parent
+        hinerv_root = gui_dir.parent
+        
+        # Change to HiNeRV root directory for execution
+        os.chdir(hinerv_root)
+        
         # Base arguments
         args = [
             "accelerate", "launch",
-            "--mixed_precision", "fp16",
-            "--dynamo_backend", "inductor",
-            "hinerv_train.py",
-            "--frames_dir", frames_dir,
-            "--output_dir", model_dir,
+            "--mixed_precision=fp16",
+            "--dynamo_backend=inductor",
+            "hinerv_main.py",  # Changed from hinerv_train.py
+            "--dataset", frames_dir,
+            "--dataset-name", "frames",  # Using "frames" as dataset name
+            "--output", model_dir,
         ]
         
-        # Add model preset arguments
-        if 'config_file' in model_preset:
-            args.extend(["--config", model_preset['config_file']])
+        # Read config files and append their contents
+        if 'config' in model_preset and 'file_path' in model_preset:
+            config_path = model_preset['file_path']
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    config_content = f.read().strip()
+                    # Split by whitespace and add each argument
+                    config_args = config_content.split()
+                    args.extend(config_args)
         
-        # Add training options
-        for key, value in training_options.items():
-            if value is None or (isinstance(value, bool) and not value):
-                continue
-                
-            arg_name = f"--{key.replace('_', '-')}"
-            
-            # Handle boolean flags
-            if isinstance(value, bool):
-                args.append(arg_name)
-            else:
-                args.extend([arg_name, str(value)])
+        # Read training config file
+        training_config_path = os.path.join(hinerv_root, "cfgs/train/hinerv_1920x1080.txt")
+        if os.path.exists(training_config_path):
+            with open(training_config_path, 'r') as f:
+                train_config_content = f.read().strip()
+                train_args = train_config_content.split()
+                args.extend(train_args)
         
-        # Add resource limits
-        if resource_limits.get('max_memory_percentage', 100) < 100:
-            memory_limit = resource_limits['max_memory_percentage']
-            args.extend(["--max-memory-mb", str(int(memory_limit * 0.01 * self._get_total_gpu_memory()))])
-        
-        # Handle quick test
-        if self.config.get('quick_test', False):
-            # Override with minimal parameters for quick test
-            for i, arg in enumerate(args):
-                if arg == "--epochs":
-                    args[i+1] = "1"
-                elif arg == "--batch-size":
-                    args[i+1] = "2"
+        # Override with specific training options from GUI
+        args.extend([
+            "--batch-size", str(training_options.get('batch-size', 2)),
+            "--eval-batch-size", str(training_options.get('eval-batch-size', 1)),
+            "--grad-accum", "1",
+            "--log-eval", "true",
+            "--seed", "0"
+        ])
         
         return args
     
@@ -366,10 +372,14 @@ class HiNeRVProcessor(QThread):
     def _run_training_process(self, args: List[str]):
         """Run the HiNeRV training process and monitor its progress"""
         log_file = os.path.join(self.config['output_dir'], "training_log.txt")
-        rank0_log = os.path.join(self.config['model_dir'], "rank_0.txt")
+        
+        # Get the HiNeRV root directory
+        gui_dir = Path(__file__).parent.parent.parent
+        hinerv_root = gui_dir.parent
         
         # Start process
         self.logger.info(f"Starting training process with args: {' '.join(args)}")
+        self.logger.info(f"Working directory: {hinerv_root}")
         
         try:
             with open(log_file, 'w') as log:
@@ -378,7 +388,8 @@ class HiNeRVProcessor(QThread):
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     universal_newlines=True,
-                    bufsize=1
+                    bufsize=1,
+                    cwd=str(hinerv_root)  # Set working directory to HiNeRV root
                 )
                 
                 # Monitor process output
@@ -402,6 +413,10 @@ class HiNeRVProcessor(QThread):
                 return_code = process.wait()
                 
                 if return_code != 0 and self.is_running:
+                    # Read the log file to get error details
+                    with open(log_file, 'r') as f:
+                        error_details = f.read()
+                    self.logger.error(f"Training failed. Log contents:\n{error_details}")
                     raise RuntimeError(f"Training process failed with return code {return_code}")
                 
         except Exception as e:
@@ -623,3 +638,23 @@ class HiNeRVProcessor(QThread):
         # Save to file
         with open(config_file, 'w') as f:
             yaml.dump(config_copy, f, default_flow_style=False)
+        
+    def _verify_paths(self):
+        """Verify all required paths exist"""
+        gui_dir = Path(__file__).parent.parent.parent
+        hinerv_root = gui_dir.parent
+        
+        paths_to_check = {
+            "HiNeRV root": hinerv_root,
+            "hinerv_main.py": hinerv_root / "hinerv_main.py",
+            "cfgs/models": hinerv_root / "cfgs" / "models",
+            "cfgs/train": hinerv_root / "cfgs" / "train",
+            "Training config": hinerv_root / "cfgs" / "train" / "hinerv_1920x1080.txt",
+            "Model config": hinerv_root / "cfgs" / "models" / "uvg-hinerv-s_1920x1080.txt"
+        }
+        
+        for name, path in paths_to_check.items():
+            if path.exists():
+                self.logger.info(f"✓ {name}: {path}")
+            else:
+                self.logger.error(f"✗ {name}: {path} (NOT FOUND)")

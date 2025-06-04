@@ -45,7 +45,25 @@ class ConfigManager:
         self._load_hinerv_configs()
         
         logger.debug(f"ConfigManager initialized with config_dir: {self.config_dir}")
-    
+    def get_default_training_config(self) -> Dict[str, Any]:
+        """Get the default training configuration"""
+        # Try to load hinerv_1920x1080.txt first
+        default_configs = ["hinerv_1920x1080.txt", "default.txt"]
+        
+        for config_name in default_configs:
+            config = self.get_training_config(config_name)
+            if config:
+                return config
+        
+        # If no configs found, return hardcoded defaults
+        return {
+            'epochs': 30,
+            'batch-size': 2,
+            'lr': 0.002,
+            'optimizer': 'adam',
+            'loss': '0.7 l1 0.3 ms-ssim_5x5',
+            'max-frames': 100
+        }
     def _get_app_directory(self) -> str:
         """
         Get the application directory

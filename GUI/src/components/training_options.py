@@ -486,22 +486,7 @@ class TrainingOptionsWidget(QWidget):
         height = video_info.get('height', 1080)
         self.input_size_edit.setText(f"{height} {width}")
         
-        # Estimate frame count
-        fps = video_info.get('fps', 30)
-        duration = video_info.get('duration', 60)
-        total_frames = int(fps * duration)
-        
-        # Warn if too many frames
-        if total_frames > self.max_frames_spin.value():
-            from PySide6.QtWidgets import QMessageBox
-            reply = QMessageBox.question(
-                self, "Large Video",
-                f"Video has {total_frames} frames, which is more than the max frames limit of {self.max_frames_spin.value()}.\n\n"
-                f"Do you want to increase the max frames to {total_frames}?",
-                QMessageBox.Yes | QMessageBox.No
-            )
-            if reply == QMessageBox.Yes:
-                self.max_frames_spin.setValue(total_frames)
+
     
     def validate_options(self) -> tuple[bool, str]:
         """Validate current options and return (is_valid, error_message)"""

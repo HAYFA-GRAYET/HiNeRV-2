@@ -221,24 +221,88 @@ class HiNeRVProcessor(QThread):
         model_dir = os.path.join(output_dir, "model")
         os.makedirs(model_dir, exist_ok=True)
         
-        # Create command line arguments for HiNeRV
-        args = self._build_training_args(frames_dir, model_dir, training_options, model_preset, resource_limits)
-        
-        # Write args to file for debugging
-        args_file = os.path.join(output_dir, "training_args.txt")
-        with open(args_file, 'w') as f:
-            f.write(" ".join(args))
-        
-        # Start training process
-        self.status_updated.emit("Starting training...")
-        self._run_training_process(args)
-        
-        # Update config
+        # Store model_dir in config BEFORE using it
         self.config['model_dir'] = model_dir
         self._save_config()
         
+        # Get total frames
+        total_frames = self.config.get('frame_count', 0)
+        max_frames_per_batch = 100  # Process 100 frames at a time
+        
+        if total_frames <= max_frames_per_batch:
+            # Process all frames in one batch
+            self._train_single_batch(frames_dir, model_dir, training_options, model_preset, resource_limits)
+        else:
+            # Process in batches
+            self._train_multiple_batches(frames_dir, model_dir, training_options, model_preset, resource_limits, total_frames, max_frames_per_batch)
+        
         self.status_updated.emit("Training complete")
-    
+        
+    def _train_single_batch(self, frames_dir, model_dir, training_options, model_preset, resource_limits):
+        """Train on a single batch of frames"""
+        args = self._build_training_args(frames_dir, model_dir, training_options, model_preset, resource_limits)
+        args_file = os.path.join(self.config['output_dir'], "training_args.txt")
+        with open(args_file, 'w') as f:
+            f.write(" ".join(args))
+        
+        self.status_updated.emit("Starting training...")
+        self._run_training_process(args)
+
+    def _train_multiple_batches(self, frames_dir, model_dir, training_options, model_preset, resource_limits, total_frames, max_frames_per_batch):
+        """Train on multiple batches of frames"""
+        num_batches = (total_frames + max_frames_per_batch - 1) // max_frames_per_batch
+        
+        self.status_updated.emit(f"Processing {total_frames} frames in {num_batches} batches...")
+        
+        # Create batch directories
+        batch_models = []
+        
+        for batch_idx in range(num_batches):
+            if not self.is_running:
+                return
+                
+            # Calculate frame range for this batch
+            start_frame = batch_idx * max_frames_per_batch
+            end_frame = min((batch_idx + 1) * max_frames_per_batch, total_frames)
+            batch_size = end_frame - start_frame
+            
+            self.status_updated.emit(f"Processing batch {batch_idx + 1}/{num_batches} (frames {start_frame}-{end_frame})...")
+            
+            # Create batch-specific directories
+            batch_frames_dir = os.path.join(self.config['output_dir'], f"batch_{batch_idx}_frames")
+            batch_model_dir = os.path.join(model_dir, f"batch_{batch_idx}")
+            os.makedirs(batch_frames_dir, exist_ok=True)
+            os.makedirs(batch_model_dir, exist_ok=True)
+            
+            # Copy frames for this batch
+            import shutil
+            for i in range(start_frame, end_frame):
+                src_frame = os.path.join(frames_dir, f"frame_{i+1:06d}.png")
+                dst_frame = os.path.join(batch_frames_dir, f"frame_{i-start_frame+1:06d}.png")
+                if os.path.exists(src_frame):
+                    shutil.copy2(src_frame, dst_frame)
+            
+            # Train on this batch
+            args = self._build_training_args(batch_frames_dir, batch_model_dir, training_options, model_preset, resource_limits)
+            
+            # Update progress for overall process
+            overall_progress = (batch_idx + 0.5) / num_batches
+            self.progress_updated.emit({
+                'progress': overall_progress,
+                'status': f"Training batch {batch_idx + 1}/{num_batches}",
+                'elapsed_time': time.time() - self.start_time
+            })
+            
+            self._run_training_process(args)
+            
+            batch_models.append(batch_model_dir)
+            
+            # Clean up batch frames to save space
+            shutil.rmtree(batch_frames_dir)
+        
+        # Store batch model directories
+        self.config['batch_models'] = batch_models
+        self._save_config()
     def _build_training_args(self, frames_dir: str, model_dir: str, 
                            training_options: Dict, model_preset: Dict,
                            resource_limits: Dict) -> List[str]:

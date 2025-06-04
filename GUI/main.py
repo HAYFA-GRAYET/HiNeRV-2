@@ -474,14 +474,13 @@ class MainWindow(QMainWindow):
         self.current_video = video_info
         self.logger.info(f"Loaded video: {video_info['path']}")
         
-        # Update UI elements based on video info
+    # Update UI elements based on video info
         self.training_options.update_for_video(video_info)
         self.resource_guard.update_for_video(video_info)
         
         # Enable start button
         self.start_btn.setEnabled(True)
         self.start_action.setEnabled(True)
-        self.quick_test_btn.setEnabled(True)
     
     def on_video_error(self, error_msg: str):
         """Handle video loading error"""
@@ -556,13 +555,40 @@ class MainWindow(QMainWindow):
     
     def create_compression_config(self) -> Dict:
         """Create compression configuration from UI settings"""
-        config = {
-            'video_path': self.current_video['path'],
-            'output_dir': self.get_output_directory(),
-            'model_preset': self.model_presets.get_selected_preset(),
-            'training_options': self.training_options.get_options(),
-            'resource_limits': self.resource_guard.get_limits(),
-        }
+        # In non-dev mode, use defaults
+        if not self.dev_mode:
+            # Get default model preset
+            model_preset = None
+            for i in range(self.model_presets.preset_combo.count()):
+                file_path = self.model_presets.preset_combo.itemData(i)
+                if "uvg-hinerv-s_1920x1080.txt" in file_path:
+                    self.model_presets.preset_combo.setCurrentIndex(i)
+                    model_preset = self.model_presets.get_selected_preset()
+                    break
+            
+            if not model_preset:
+                model_preset = self.model_presets.get_selected_preset()
+            
+            # Get default training options
+            default_training = self.config_manager.get_default_training_config()
+            
+            config = {
+                'video_path': self.current_video['path'],
+                'output_dir': self.get_output_directory(),
+                'model_preset': model_preset,
+                'training_options': default_training,
+                'resource_limits': self.resource_guard.get_limits(),
+            }
+        else:
+            # Original implementation for dev mode
+            config = {
+                'video_path': self.current_video['path'],
+                'output_dir': self.get_output_directory(),
+                'model_preset': self.model_presets.get_selected_preset(),
+                'training_options': self.training_options.get_options(),
+                'resource_limits': self.resource_guard.get_limits(),
+            }
+        
         return config
     
     def get_output_directory(self) -> str:

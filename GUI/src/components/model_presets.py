@@ -101,6 +101,22 @@ class ModelPresetsWidget(QWidget):
                 preset_name = self.get_preset_name(file_path)
                 self.preset_combo.addItem(preset_name, str(file_path))
             
+            # Set default preset
+            default_preset = "uvg-hinerv-s_1920x1080.txt"
+            default_index = -1
+            
+            for i in range(self.preset_combo.count()):
+                file_path = self.preset_combo.itemData(i)
+                if default_preset in file_path:
+                    default_index = i
+                    break
+            
+            if default_index >= 0:
+                self.preset_combo.setCurrentIndex(default_index)
+            else:
+                # Fallback to first preset
+                self.preset_combo.setCurrentIndex(0)
+            
             self.logger.info(f"Loaded {len(preset_files)} model presets")
             
         except Exception as e:

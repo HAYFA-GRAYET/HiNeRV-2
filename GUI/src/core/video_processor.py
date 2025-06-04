@@ -85,52 +85,35 @@ class VideoProcessor(QObject):
     def extract_frames(self, video_path: str, output_dir: str, frame_limit: Optional[int] = None) -> bool:
         """Extract frames from video"""
         try:
-            # Ensure frame_limit is positive
-            if frame_limit is not None and frame_limit <= 0:
-                frame_limit = None
-                
             # Build FFmpeg command
             frame_pattern = os.path.join(output_dir, "frame_%06d.png")
-            if frame_limit:
+            
+            if frame_limit and frame_limit > 0:
+                # Extract specific number of frames
                 cmd = [
                     "ffmpeg", "-i", video_path,
-                    "-vf", f"select=between(n\\,0\\,{frame_limit-1})",
-                    "-vsync", "0", "-q:v", "0",
+                    "-frames:v", str(frame_limit),
+                    "-q:v", "0",
                     frame_pattern
                 ]
             else:
+                # Extract all frames
                 cmd = [
                     "ffmpeg", "-i", video_path,
-                    "-vf", "select=between(n\\,0\\,-1)",
-                    "-vsync", "0", "-q:v", "0",
+                    "-q:v", "0",
                     frame_pattern
                 ]
                 
             # Run FFmpeg command
             logging.info(f"Running FFmpeg command: {' '.join(cmd)}")
-            process = subprocess.Popen(
+            process = subprocess.run(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 universal_newlines=True
             )
             
-            # Monitor progress
-            current_frame = 0
-            while True:
-                line = process.stderr.readline()
-                if not line:
-                    break
-                    
-                # Update progress
-                if frame_limit:
-                    progress = min(int(current_frame * 100 / frame_limit), 100)
-                else:
-                    progress = 0
-                current_frame += 1
-                
-            return_code = process.wait()
-            return return_code == 0
+            return process.returncode == 0
             
         except Exception as e:
             logging.error(f"Error extracting frames: {e}")

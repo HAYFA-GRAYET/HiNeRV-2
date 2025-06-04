@@ -229,7 +229,7 @@ class HiNeRVProcessor(QThread):
         
         # Get total frames
         total_frames = self.config.get('frame_count', 0)
-        max_frames_per_batch = 100  # Process 100 frames at a time
+        max_frames_per_batch = 60  
         
         if total_frames <= max_frames_per_batch:
             # Process all frames in one batch
@@ -349,15 +349,36 @@ class HiNeRVProcessor(QThread):
                 train_config_content = f.read().strip()
                 train_args = train_config_content.split()
                 args.extend(train_args)
-        
-        # Override with specific training options from GUI
+
+
         args.extend([
-            "--batch-size", str(training_options.get('batch-size', 2)),
-            "--eval-batch-size", str(training_options.get('eval-batch-size', 1)),
-            "--grad-accum", "1",
-            "--log-eval", "true",
-            "--seed", "0"
+            "--patch-size",       "1", "120", "120",
+            "--eval-patch-size",  "1", "120", "120",
+            "--batch-size",       "1",
+            "--eval-batch-size",  "1",
+            "--no-profile",               
+            "--dynamo_backend=no"         
         ])
+        # Override with specific training options from GUI
+        # low_mem = resource_limits.get("low_mem", False)
+
+        # if low_mem:          # (set by the Low-VRAM checkbox in the GUI)
+        #     args.extend([
+        #         "--patch-size",       "1", "120", "120",
+        #         "--eval-patch-size",  "1", "120", "120",
+        #         "--batch-size",       "1",
+        #         "--eval-batch-size",  "1",
+        #         "--no-profile",              # skip Flops profiler
+        #         "--dynamo_backend=no"        # skip large inductor compile step
+        #     ])
+        # else :
+        #     args.extend([
+        #         "--batch-size", str(training_options.get('batch-size', 2)),
+        #         "--eval-batch-size", str(training_options.get('eval-batch-size', 1)),
+        #         "--grad-accum", "1",
+        #         "--log-eval", "true",
+        #         "--seed", "0"
+        #     ])
         
         return args
     
@@ -416,9 +437,9 @@ class HiNeRVProcessor(QThread):
                 # Update status to show we're initializing
                 self.status_updated.emit("Initializing training environment...")
                 self.progress_updated.emit({
-                    'status': 'Initializing training environment...',
-                    'progress': 0.0,
-                    'elapsed_time': time.time() - self.start_time
+                    "progress": 0.0,
+                    "status":   "Initializing training environment…",
+                    "elapsed_time": time.time() - self.start_time,
                 })
                 
                 # Monitor process output

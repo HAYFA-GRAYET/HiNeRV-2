@@ -82,47 +82,39 @@ class VideoProcessor(QObject):
             self.logger.error(error_msg, exc_info=True)
             self.error_occurred.emit(error_msg)
     
-    def extract_frames(self, video_path: str, output_dir: str, frame_limit: Optional[int] = None) -> bool:
-        """Extract frames from video in HiNeRV expected format"""
-        try:
-            # HiNeRV expects frames directly in the output_dir, not in a subdirectory
-            # The frame pattern should be directly in output_dir
-            frame_pattern = os.path.join(output_dir, "%06d.png")  # HiNeRV expects this naming
-            
-            if frame_limit and frame_limit > 0:
-                # Extract specific number of frames
-                cmd = [
-                    "ffmpeg", "-i", video_path,
-                    "-frames:v", str(frame_limit),
-                    "-q:v", "0",
-                    frame_pattern
-                ]
-            else:
-                # Extract all frames
-                cmd = [
-                    "ffmpeg", "-i", video_path,
-                    "-q:v", "0",
-                    frame_pattern
-                ]
-                
-            # Run FFmpeg command
-            logging.info(f"Running FFmpeg command: {' '.join(cmd)}")
-            process = subprocess.run(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                universal_newlines=True
-            )
-            
-            if process.returncode != 0:
-                logging.error(f"FFmpeg error: {process.stderr}")
-                return False
-                
-            return True
-            
-        except Exception as e:
-            logging.error(f"Error extracting frames: {e}")
-            return False
+    def _extract_frames(self, video_path: str, output_dir: str) -> str:
+        """Extract frames from video"""
+        frames_dir = os.path.join(output_dir, "frames")
+        os.makedirs(frames_dir, exist_ok=True)
+        
+        # Check if frames already exist
+        existing_frames = [f for f in os.listdir(frames_dir) if f.endswith('.png')]
+        if existing_frames:
+            self.logger.info(f"Found {len(existing_frames)} existing frames, skipping extraction")
+            return frames_dir
+        
+        # Extract frames using FFmpeg
+        cmd = [
+            'ffmpeg',
+            '-i', video_path,
+            '-q:v', '0',  # Best quality
+            os.path.join(frames_dir, '%06d.png')
+        ]
+        
+        self.logger.info(f"Running FFmpeg command: {' '.join(cmd)}")
+        self.status_updated.emit("Extracting frames from video...")
+        
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(f"FFmpeg failed: {result.stderr}")
+        
+        # Verify frames were extracted
+        extracted_frames = [f for f in os.listdir(frames_dir) if f.endswith('.png')]
+        if not extracted_frames:
+            raise RuntimeError("No frames were extracted from the video")
+        
+        self.logger.info(f"Successfully extracted {len(extracted_frames)} frames")
+        return frames_dir  # Return the frames directory path
     
     def postprocess_video(self, 
                          compressed_dir: str, 

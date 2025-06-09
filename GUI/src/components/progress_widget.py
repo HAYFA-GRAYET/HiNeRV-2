@@ -642,15 +642,15 @@ class ProgressWidget(QWidget):
                 seconds = int(elapsed % 60)
                 self.time_label.setText(f"Elapsed: {hours}:{minutes:02d}:{seconds:02d}")
         
-    # def update_progress(self, progress_data: Dict):
-    #     """Update training progress"""
-    #     self.training_progress.update_progress(progress_data)
+    def update_progress(self, progress_data: Dict):
+        """Update training progress"""
+        self.training_progress.update_progress(progress_data)
         
-    #     if not self.training_started:
-    #         self.training_started = True
-    #         # Set up log monitoring if log path is provided
-    #         if 'log_path' in progress_data:
-    #             self.log_viewer.set_log_path(progress_data['log_path'])
+        if not self.training_started:
+            self.training_started = True
+            # Set up log monitoring if log path is provided
+            if 'log_path' in progress_data:
+                self.log_viewer.set_log_path(progress_data['log_path'])
     
     def update_system_stats(self, stats: Dict):
         """Update system statistics"""

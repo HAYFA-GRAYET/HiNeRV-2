@@ -352,15 +352,11 @@ class HiNeRVProcessor(QThread):
 
 
         args.extend([
-            "--patch-size",       "1", "60", "60",     
-            "--eval-patch-size",  "1", "60", "60",     
-            "--batch-size",       "1",                   
-            "--eval-batch-size",  "1",                   
-            "--grad-accum",       "4",                   
-            "--no-profile",                             
-            "--cached",           "none",               
-            "--amp",              "true",               
-            "--checkpoint-activations", "true",         
+            "--batch-size", "1",
+            "--eval-batch-size", "1", 
+            "--grad-accum", "1",
+            "--log-eval", "true",
+            "--seed", "0"
         ])
         
         return args
@@ -464,12 +460,14 @@ class HiNeRVProcessor(QThread):
             self.logger.exception("Error running training process")
             raise RuntimeError(f"Error running training process: {str(e)}")
     
+    
     def _parse_progress_line(self, line: str):
         """Parse a line of output from the training process"""
         try:
             # Check if in dev mode
             try:
-                from main import DEV_MODE_ENABLED
+                from main import is_dev_mode
+                DEV_MODE_ENABLED = is_dev_mode()
             except ImportError:
                 DEV_MODE_ENABLED = False
 
@@ -495,26 +493,31 @@ class HiNeRVProcessor(QThread):
                         total_epochs = int(match.group(1))
                         self.progress_updated.emit({
                             'status': f'Preparing to train for {total_epochs} total epochs...',
+                            'progress': 0.0,
                             'elapsed_time': time.time() - self.start_time
                         })
                 elif "Create training dataset" in line:
                     self.progress_updated.emit({
                         'status': "Creating training dataset...",
+                        'progress': 0.05,
                         'elapsed_time': time.time() - self.start_time
                     })
                 elif "Create model:" in line:
                     self.progress_updated.emit({
                         'status': "Initializing model architecture...",
+                        'progress': 0.1,
                         'elapsed_time': time.time() - self.start_time
                     })
                 elif "Number of parameters:" in line:
                     self.progress_updated.emit({
                         'status': "Model initialized, calculating parameters...",
+                        'progress': 0.15,
                         'elapsed_time': time.time() - self.start_time
                     })
                 elif "Flops profiler" in line:
                     self.progress_updated.emit({
                         'status': "Profiling model performance...",
+                        'progress': 0.2,
                         'elapsed_time': time.time() - self.start_time
                     })
                 elif "Epoch" in line and "/" in line:
@@ -525,13 +528,19 @@ class HiNeRVProcessor(QThread):
                     if epoch_match:
                         current_epoch = int(epoch_match.group(1))
                         total_epochs = int(epoch_match.group(2))
-                        progress = current_epoch / total_epochs if total_epochs > 0 else 0
+                        progress = (current_epoch / total_epochs) if total_epochs > 0 else 0
                         
                         self.progress_updated.emit({
                             'progress': progress,
                             'status': f"Training model... Epoch {current_epoch}/{total_epochs}",
                             'elapsed_time': time.time() - self.start_time
                         })
+                elif "Best model found" in line or "Training completed" in line:
+                    self.progress_updated.emit({
+                        'progress': 1.0,
+                        'status': "Training completed!",
+                        'elapsed_time': time.time() - self.start_time
+                    })
             else:
                 # Original detailed parsing for dev mode
                 if "Epoch:" in line:
@@ -580,7 +589,8 @@ class HiNeRVProcessor(QThread):
                     )
         except Exception as e:
             # Just log errors in parsing, don't break the process
-            self.logger.error(f"Error parsing progress line: {str(e)}")
+            self.logger.debug(f"Error parsing progress line: {str(e)}")    # Override specific parameters for low memory usage
+
         
     def _generate_output(self):
         """Generate the compressed output video"""

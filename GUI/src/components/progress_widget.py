@@ -644,12 +644,19 @@ class ProgressWidget(QWidget):
         
     def update_progress(self, progress_data: Dict):
         """Update training progress"""
-        self.training_progress.update_progress(progress_data)
+        # Check if in dev mode
+        from main import DEV_MODE_ENABLED
+        
+        if DEV_MODE_ENABLED and hasattr(self, 'training_progress'):
+            self.training_progress.update_progress(progress_data)
+        else:
+            # Update simple progress for non-dev mode
+            self.update_simple_progress(progress_data)
         
         if not self.training_started:
             self.training_started = True
             # Set up log monitoring if log path is provided
-            if 'log_path' in progress_data:
+            if 'log_path' in progress_data and hasattr(self, 'log_viewer'):
                 self.log_viewer.set_log_path(progress_data['log_path'])
     
     def update_system_stats(self, stats: Dict):

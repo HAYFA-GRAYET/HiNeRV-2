@@ -590,6 +590,7 @@ class HiNeRVProcessor(QThread):
         except Exception as e:
             # Just log errors in parsing, don't break the process
             self.logger.debug(f"Error parsing progress line: {str(e)}")    # Override specific parameters for low memory usage
+        # Don't add these as they'll duplicate or conflict with config file args
 
         
     def _generate_output(self):

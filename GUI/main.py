@@ -53,10 +53,8 @@ APP_VERSION = "1.0.0"
 CONFIG_FILE = "config.json"
 LOG_FILE = "hinerv_gui.log"
 
-# In main.py, add this after the imports and before the MainWindow class:
-DEV_MODE_ENABLED = False  # Global flag for dev mode
+DEV_MODE_ENABLED = False  
 
-# In MainWindow.__init__, add after self.setup_logging():
 
 class MainWindow(QMainWindow):
     """Main application window"""

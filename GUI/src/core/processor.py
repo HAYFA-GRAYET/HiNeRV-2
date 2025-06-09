@@ -352,33 +352,16 @@ class HiNeRVProcessor(QThread):
 
 
         args.extend([
-            "--patch-size",       "1", "120", "120",
-            "--eval-patch-size",  "1", "120", "120",
-            "--batch-size",       "1",
-            "--eval-batch-size",  "1",
-            "--no-profile",               
-            "--dynamo_backend=no"         
+            "--patch-size",       "1", "60", "60",     
+            "--eval-patch-size",  "1", "60", "60",     
+            "--batch-size",       "1",                   
+            "--eval-batch-size",  "1",                   
+            "--grad-accum",       "4",                   
+            "--no-profile",                             
+            "--cached",           "none",               
+            "--amp",              "true",               
+            "--checkpoint-activations", "true",         
         ])
-        # Override with specific training options from GUI
-        # low_mem = resource_limits.get("low_mem", False)
-
-        # if low_mem:          # (set by the Low-VRAM checkbox in the GUI)
-        #     args.extend([
-        #         "--patch-size",       "1", "120", "120",
-        #         "--eval-patch-size",  "1", "120", "120",
-        #         "--batch-size",       "1",
-        #         "--eval-batch-size",  "1",
-        #         "--no-profile",              # skip Flops profiler
-        #         "--dynamo_backend=no"        # skip large inductor compile step
-        #     ])
-        # else :
-        #     args.extend([
-        #         "--batch-size", str(training_options.get('batch-size', 2)),
-        #         "--eval-batch-size", str(training_options.get('eval-batch-size', 1)),
-        #         "--grad-accum", "1",
-        #         "--log-eval", "true",
-        #         "--seed", "0"
-        #     ])
         
         return args
     

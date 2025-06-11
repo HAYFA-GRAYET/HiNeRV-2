@@ -168,7 +168,7 @@ class VideoProcessor(QThread):
         
         # Add runtime parameters
         cmd.extend([
-            "--batch-size", "2",
+            "--batch-size", "1",
             "--eval-batch-size", "1",
             "--grad-accum", "1",
             "--log-eval", "true",

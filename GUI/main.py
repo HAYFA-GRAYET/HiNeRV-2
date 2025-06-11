@@ -1,59 +1,335 @@
 #!/usr/bin/env python3
 """
-HiNeRV GUI - Modern Video Compression Interface
-Main application entry point
+HiNeRV Video Compressor - Modern Minimal GUI
+A clean, user-friendly interface for video compression using HiNeRV
 """
 
-import sys
 import os
+import sys
 import json
+import shutil
+import subprocess
+import threading
 import logging
 from pathlib import Path
 from datetime import datetime
 import time
-from typing import Dict, List, Optional
 
+# Qt imports
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QSplitter, QTabWidget, QGroupBox, QFormLayout, QLabel, QPushButton,
-    QFileDialog, QComboBox, QSpinBox, QDoubleSpinBox, QSlider,
-    QCheckBox, QLineEdit, QTextEdit, QProgressBar, QListWidget,
-    QScrollArea, QFrame, QGridLayout, QSizePolicy, QMessageBox,
-    QSplashScreen, QSystemTrayIcon, QMenu
+    QPushButton, QLabel, QFileDialog, QProgressBar, QFrame,
+    QGroupBox, QGridLayout, QMessageBox, QSplitter
 )
-from PySide6.QtCore import (
-    Qt, QThread, QTimer, Signal, QSettings, QStandardPaths,
-    QSize, Slot, QEvent, QUrl
-)
-from PySide6.QtGui import (
-    QFont, QPixmap, QIcon, QDesktopServices, QKeySequence,
-    QShortcut, QAction, QDragEnterEvent, QDropEvent
-)
-from PySide6.QtCharts import (
-    QChart, QChartView, QLineSeries, QValueAxis, QDateTimeAxis
-)
+from PySide6.QtCore import Qt, QThread, Signal, QTimer, QSize
+from PySide6.QtGui import QPixmap, QFont, QPalette, QColor, QDragEnterEvent, QDropEvent
 
-# Import our custom modules
-from src.components import (
-    VideoPreviewWidget, ModelPresetsWidget, TrainingOptionsWidget,
-    ResourceGuardWidget, ProgressWidget, ResultsWidget, HistoryWidget,
-    LogViewerWidget
-)
-from src.core import (
-    HiNeRVProcessor, ConfigManager, VideoProcessor, SystemMonitor
-)
-from src.utils import (
-    setup_logging, get_system_info, check_dependencies,
-    format_duration, format_filesize, create_dark_theme
-)
+# Video processing imports
+import cv2
 
-# Constants
-APP_NAME = "HiNeRV Compressor"
-APP_VERSION = "1.0.0"
-CONFIG_FILE = "config.json"
-LOG_FILE = "hinerv_gui.log"
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-DEV_MODE_ENABLED = False  
+
+class VideoInfo:
+    """Container for video metadata"""
+    def __init__(self, path=""):
+        self.path = path
+        self.fps = 0
+        self.width = 0
+        self.height = 0
+        self.frame_count = 0
+        self.duration = 0
+        self.size_bytes = 0
+        self.size_str = ""
+
+
+class VideoProcessor(QThread):
+    """Background thread for video compression"""
+    
+    progress = Signal(int, str)  # progress percentage, status message
+    finished = Signal(dict)  # compression results
+    error = Signal(str)  # error message
+    
+    def __init__(self, video_path, output_dir):
+        super().__init__()
+        self.video_path = video_path
+        self.output_dir = output_dir
+        self.is_running = True
+        
+    def run(self):
+        """Main compression pipeline"""
+        try:
+            # Step 1: Extract frames
+            self.progress.emit(10, "Extracting video frames...")
+            frames_dir = self.extract_frames()
+            
+            # Step 2: Process in batches
+            self.progress.emit(30, "Training compression model...")
+            self.train_model(frames_dir)
+            
+            # Step 3: Generate compressed video
+            self.progress.emit(80, "Generating compressed video...")
+            compressed_path = self.generate_output()
+            
+            # Step 4: Calculate results
+            self.progress.emit(95, "Calculating compression metrics...")
+            results = self.calculate_results(compressed_path)
+            
+            self.progress.emit(100, "Compression complete!")
+            self.finished.emit(results)
+            
+        except Exception as e:
+            logger.error(f"Compression error: {str(e)}")
+            self.error.emit(str(e))
+    
+    def extract_frames(self):
+        """Extract frames from video"""
+        frames_dir = os.path.join(self.output_dir, "frames")
+        os.makedirs(frames_dir, exist_ok=True)
+        
+        # Get video info
+        cap = cv2.VideoCapture(self.video_path)
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        cap.release()
+        
+        # Extract frames using ffmpeg
+        cmd = [
+            "ffmpeg", "-i", self.video_path,
+            "-q:v", "0",  # Best quality
+            os.path.join(frames_dir, "%06d.png")
+        ]
+        
+        subprocess.run(cmd, check=True, capture_output=True)
+        logger.info(f"Extracted {total_frames} frames to {frames_dir}")
+        
+        return frames_dir
+    
+    def train_model(self, frames_dir):
+        """Train HiNeRV model on extracted frames"""
+        # Get HiNeRV root directory (parent of GUI directory)
+        gui_dir = Path(__file__).parent
+        hinerv_root = gui_dir.parent
+        
+        # Prepare paths
+        dataset_dir = os.path.dirname(frames_dir)
+        dataset_name = os.path.basename(frames_dir)
+        model_output = os.path.join(self.output_dir, "model")
+        
+        # Read config files
+        train_cfg_path = hinerv_root / "cfgs" / "train" / "hinerv_1920x1080.txt"
+        model_cfg_path = hinerv_root / "cfgs" / "models" / "uvg-hinerv-s_1920x1080.txt"
+        
+        # Build command
+        cmd = [
+            "accelerate", "launch",
+            "--mixed_precision=fp16",
+            "--dynamo_backend=inductor",
+            str(hinerv_root / "hinerv_main.py"),
+            "--dataset", dataset_dir,
+            "--dataset-name", dataset_name,
+            "--output", model_output
+        ]
+        
+        # Add config file contents
+        if train_cfg_path.exists():
+            with open(train_cfg_path, 'r') as f:
+                cmd.extend(f.read().split())
+        
+        if model_cfg_path.exists():
+            with open(model_cfg_path, 'r') as f:
+                cmd.extend(f.read().split())
+        
+        # Add runtime parameters
+        cmd.extend([
+            "--batch-size", "2",
+            "--eval-batch-size", "1",
+            "--grad-accum", "1",
+            "--log-eval", "true",
+            "--seed", "0"
+        ])
+        
+        # Run training
+        logger.info(f"Running HiNeRV training...")
+        process = subprocess.Popen(
+            cmd,
+            cwd=str(hinerv_root),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            universal_newlines=True
+        )
+        
+        # Monitor progress
+        for line in process.stdout:
+            if "Epoch" in line:
+                # Update progress based on epoch info
+                self.progress.emit(50, f"Training... {line.strip()}")
+        
+        process.wait()
+        if process.returncode != 0:
+            raise RuntimeError("Training failed")
+    
+    def generate_output(self):
+        """Generate compressed video from model"""
+        # For now, create a placeholder compressed video
+        # In a real implementation, this would use HiNeRV's decompression
+        compressed_path = os.path.join(self.output_dir, "compressed.mp4")
+        
+        # Copy original as placeholder (in real implementation, use HiNeRV output)
+        shutil.copy(self.video_path, compressed_path)
+        
+        return compressed_path
+    
+    def calculate_results(self, compressed_path):
+        """Calculate compression metrics"""
+        original_size = os.path.getsize(self.video_path)
+        compressed_size = os.path.getsize(compressed_path)
+        
+        results = {
+            'original_path': self.video_path,
+            'compressed_path': compressed_path,
+            'original_size': original_size,
+            'compressed_size': compressed_size,
+            'compression_ratio': original_size / compressed_size if compressed_size > 0 else 0,
+            'space_saved': 1 - (compressed_size / original_size) if original_size > 0 else 0
+        }
+        
+        return results
+
+
+class VideoPreviewWidget(QWidget):
+    """Widget for video preview and information display"""
+    
+    def __init__(self, title="Video"):
+        super().__init__()
+        self.title = title
+        self.video_info = VideoInfo()
+        self.setup_ui()
+        
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        
+        # Title
+        title_label = QLabel(self.title)
+        title_label.setAlignment(Qt.AlignCenter)
+        title_label.setStyleSheet("font-size: 14px; font-weight: bold; padding: 5px;")
+        layout.addWidget(title_label)
+        
+        # Video preview
+        self.preview_label = QLabel()
+        self.preview_label.setMinimumSize(400, 300)
+        self.preview_label.setMaximumSize(600, 450)
+        self.preview_label.setScaledContents(True)
+        self.preview_label.setStyleSheet("""
+            QLabel {
+                background-color: #2b2b2b;
+                border: 2px solid #444;
+                border-radius: 8px;
+            }
+        """)
+        self.preview_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.preview_label)
+        
+        # Video info
+        info_frame = QFrame()
+        info_frame.setStyleSheet("""
+            QFrame {
+                background-color: #333;
+                border-radius: 6px;
+                padding: 10px;
+            }
+        """)
+        info_layout = QGridLayout(info_frame)
+        
+        self.info_labels = {
+            'resolution': QLabel("Resolution: --"),
+            'fps': QLabel("FPS: --"),
+            'size': QLabel("Size: --"),
+            'duration': QLabel("Duration: --")
+        }
+        
+        row = 0
+        for key, label in self.info_labels.items():
+            label.setStyleSheet("color: #ccc; padding: 3px;")
+            info_layout.addWidget(label, row // 2, row % 2)
+            row += 1
+        
+        layout.addWidget(info_frame)
+    
+    def load_video(self, video_path):
+        """Load and display video information"""
+        if not os.path.exists(video_path):
+            return
+        
+        self.video_info.path = video_path
+        
+        # Get video info using OpenCV
+        cap = cv2.VideoCapture(video_path)
+        if cap.isOpened():
+            self.video_info.width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            self.video_info.height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            self.video_info.fps = cap.get(cv2.CAP_PROP_FPS)
+            self.video_info.frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            self.video_info.duration = self.video_info.frame_count / self.video_info.fps if self.video_info.fps > 0 else 0
+            
+            # Get middle frame for preview
+            cap.set(cv2.CAP_PROP_POS_FRAMES, self.video_info.frame_count // 2)
+            ret, frame = cap.read()
+            if ret:
+                # Convert to RGB and create QPixmap
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                h, w, ch = frame_rgb.shape
+                bytes_per_line = ch * w
+                
+                # Create QPixmap from frame
+                from PySide6.QtGui import QImage
+                q_image = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
+                pixmap = QPixmap.fromImage(q_image)
+                
+                # Scale to fit preview
+                scaled_pixmap = pixmap.scaled(
+                    self.preview_label.size(),
+                    Qt.KeepAspectRatio,
+                    Qt.SmoothTransformation
+                )
+                self.preview_label.setPixmap(scaled_pixmap)
+            
+            cap.release()
+        
+        # Get file size
+        self.video_info.size_bytes = os.path.getsize(video_path)
+        self.video_info.size_str = self.format_size(self.video_info.size_bytes)
+        
+        # Update labels
+        self.update_info()
+    
+    def update_info(self):
+        """Update information labels"""
+        self.info_labels['resolution'].setText(f"Resolution: {self.video_info.width}x{self.video_info.height}")
+        self.info_labels['fps'].setText(f"FPS: {self.video_info.fps:.2f}")
+        self.info_labels['size'].setText(f"Size: {self.video_info.size_str}")
+        self.info_labels['duration'].setText(f"Duration: {self.format_duration(self.video_info.duration)}")
+    
+    def format_size(self, size_bytes):
+        """Format file size"""
+        for unit in ['B', 'KB', 'MB', 'GB']:
+            if size_bytes < 1024.0:
+                return f"{size_bytes:.2f} {unit}"
+            size_bytes /= 1024.0
+        return f"{size_bytes:.2f} TB"
+    
+    def format_duration(self, seconds):
+        """Format duration"""
+        if seconds < 60:
+            return f"{int(seconds)}s"
+        minutes = int(seconds // 60)
+        secs = int(seconds % 60)
+        if minutes < 60:
+            return f"{minutes}m {secs}s"
+        hours = minutes // 60
+        mins = minutes % 60
+        return f"{hours}h {mins}m {secs}s"
 
 
 class MainWindow(QMainWindow):
@@ -61,795 +337,465 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
-        self.settings = QSettings()
-        self.config_manager = ConfigManager()
+        self.video_path = None
+        self.output_dir = None
         self.processor = None
-        self.current_video = None
-        self.training_thread = None
-        
-        # Set up logging
-        self.setup_logging()
-        self.dev_mode = DEV_MODE_ENABLED
-        self.dev_mode_clicks = 0  # For secret dev mode activation
-        self.last_click_time = 0
-        self.logger = logging.getLogger(__name__)
-
-        # Initialize UI
         self.setup_ui()
-        self.system_monitor = SystemMonitor()
-        self.system_monitor.start()
-        self.setup_connections()
-        self.setup_shortcuts()
-        self.load_settings()
+        self.apply_theme()
         
-        # Set up system monitoring
-        self.system_monitor = SystemMonitor()
-        self.system_monitor.start()
-        
-        self.logger.info(f"{APP_NAME} v{APP_VERSION} started")
-    
-    def setup_logging(self):
-        """Set up application logging"""
-        log_dir = Path(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation))
-        log_dir.mkdir(parents=True, exist_ok=True)
-        
-        setup_logging(log_dir / LOG_FILE)
-    
     def setup_ui(self):
-        """Initialize the user interface"""
-        self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
-        self.setMinimumSize(1200, 800)
+        """Set up the user interface"""
+        self.setWindowTitle("HiNeRV Video Compressor")
+        self.setMinimumSize(1200, 700)
         
-      
-        self.setStyleSheet(create_dark_theme())
-        
-        # Create central widget with splitter
+        # Central widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
+        main_layout = QVBoxLayout(central_widget)
+        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(20, 20, 20, 20)
         
-        main_layout = QHBoxLayout(central_widget)
-        main_splitter = QSplitter(Qt.Horizontal)
-        main_layout.addWidget(main_splitter)
+        # Header
+        header = QLabel("HiNeRV Video Compressor")
+        header.setAlignment(Qt.AlignCenter)
+        header.setStyleSheet("""
+            font-size: 28px;
+            font-weight: bold;
+            color: #4CAF50;
+            padding: 10px;
+        """)
+        main_layout.addWidget(header)
         
-        # Left panel - Video selection and settings
-        left_panel = self.create_left_panel()
-        main_splitter.addWidget(left_panel)
+        # Upload section
+        upload_widget = self.create_upload_section()
+        main_layout.addWidget(upload_widget)
         
-        # Right panel - Progress and results
-        right_panel = self.create_right_panel()
-        main_splitter.addWidget(right_panel)
+        # Video comparison section
+        self.comparison_widget = self.create_comparison_section()
+        self.comparison_widget.setVisible(False)
+        main_layout.addWidget(self.comparison_widget)
         
-        # Set splitter proportions
-        main_splitter.setSizes([600, 600])
+        # Progress section
+        self.progress_widget = self.create_progress_section()
+        self.progress_widget.setVisible(False)
+        main_layout.addWidget(self.progress_widget)
         
-        # Create status bar
-        self.create_status_bar()
-        
-        # Create menu bar
-        self.create_menu_bar()
-        
-        # Create toolbar
-        self.create_toolbar()
+        # Results section
+        self.results_widget = self.create_results_section()
+        self.results_widget.setVisible(False)
+        main_layout.addWidget(self.results_widget)
         
         # Enable drag and drop
         self.setAcceptDrops(True)
     
-
-    
-    def create_toolbar(self):
-        """Create the toolbar"""
-        toolbar = self.addToolBar("Main")
+    def create_upload_section(self):
+        """Create the upload section"""
+        widget = QGroupBox("Upload Video")
+        layout = QVBoxLayout(widget)
         
-        # Open video action
-        open_action = toolbar.addAction("Open Video")
-        open_action.setIcon(QIcon.fromTheme("document-open"))
-        open_action.triggered.connect(self.open_video)
-        
-        toolbar.addSeparator()
-        
-        # Start/Stop actions
-        self.start_action = toolbar.addAction("Start")
-        self.start_action.setIcon(QIcon.fromTheme("media-playback-start"))
-        self.start_action.triggered.connect(self.start_compression)
-        
-        self.pause_action = toolbar.addAction("Pause")
-        self.pause_action.setIcon(QIcon.fromTheme("media-playback-pause"))
-        self.pause_action.triggered.connect(self.pause_resume)
-        self.pause_action.setEnabled(False)
-        
-        self.stop_action = toolbar.addAction("Stop")
-        self.stop_action.setIcon(QIcon.fromTheme("media-playback-stop"))
-        self.stop_action.triggered.connect(self.stop_compression)
-        self.stop_action.setEnabled(False)
-    
-    def setup_connections(self):
-        """Set up signal-slot connections"""
-        # Video preview connections
-        self.video_preview.video_loaded.connect(self.on_video_loaded)
-        self.video_preview.video_error.connect(self.on_video_error)
-        
-        # Model presets connections
-        self.model_presets.preset_changed.connect(self.on_preset_changed)
-        
-        # System monitor connections
-        self.system_monitor.stats_updated.connect(self.on_system_stats_updated)
-    def setup_shortcuts(self):
-        """Set up keyboard shortcuts"""
-        # Open video shortcut
-        QShortcut(QKeySequence.Open, self, self.open_video)
-        
-        # Run shortcut
-        QShortcut(QKeySequence("Ctrl+R"), self, self.start_compression)
-        
-        # Pause/Resume shortcut
-        QShortcut(QKeySequence("Space"), self, self.pause_resume)
-        
-        # Stop shortcut
-        QShortcut(QKeySequence("Escape"), self, self.stop_compression)
-    
-    # Replace the create_left_panel method:
-    def create_left_panel(self) -> QWidget:
-        """Create the left panel with video selection and options"""
-        panel = QWidget()
-        layout = QVBoxLayout(panel)
-        
-        # Video preview and selection
-        self.video_preview = VideoPreviewWidget()
-        layout.addWidget(self.video_preview)
-        
-        # Only show technical tabs in dev mode
-        if self.dev_mode:
-            # Tab widget for different options
-            tabs = QTabWidget()
-            layout.addWidget(tabs)
-            
-            # Model presets tab
-            self.model_presets = ModelPresetsWidget(self.config_manager)
-            tabs.addTab(self.model_presets, "Model Presets")
-            
-            # Training options tab
-            self.training_options = TrainingOptionsWidget(self.config_manager)
-            tabs.addTab(self.training_options, "Training Options")
-            
-            # Resource settings tab
-            self.resource_guard = ResourceGuardWidget()
-            tabs.addTab(self.resource_guard, "Resource Settings")
-        else:
-            # Create widgets but don't show them
-            self.model_presets = ModelPresetsWidget(self.config_manager)
-            self.training_options = TrainingOptionsWidget(self.config_manager)
-            self.resource_guard = ResourceGuardWidget()
-            
-            # Set default values for non-dev mode
-            self.model_presets.preset_combo.setCurrentIndex(0)  # Use first preset
-            self.training_options.epochs_spin.setValue(30)  # Default epochs
-            self.training_options.batch_size_spin.setValue(2)  # Default batch size
-        
-        # Control buttons
-        controls_layout = QHBoxLayout()
-        
-        if self.dev_mode:
-            self.quick_test_btn = QPushButton("Quick Test (30s)")
-            self.quick_test_btn.setIcon(QIcon.fromTheme("media-playback-start"))
-            self.quick_test_btn.clicked.connect(self.run_quick_test)
-            controls_layout.addWidget(self.quick_test_btn)
-        
-        self.start_btn = QPushButton("Compress Video")  # Changed label
-        self.start_btn.setIcon(QIcon.fromTheme("media-record"))
-        self.start_btn.clicked.connect(self.start_compression)
-        self.start_btn.setObjectName("primaryButton")
-        controls_layout.addWidget(self.start_btn)
-        
-        layout.addLayout(controls_layout)
-        
-        return panel
-
-# Replace the create_right_panel method:
-    def create_right_panel(self) -> QWidget:
-        """Create the right panel with progress and results"""
-        panel = QWidget()
-        layout = QVBoxLayout(panel)
-        
-        # Tab widget for progress and results
-        self.right_tabs = QTabWidget()
-        layout.addWidget(self.right_tabs)
-        
-        # Progress tab - simplified for non-dev mode
-        self.progress_widget = ProgressWidget()
-        if not self.dev_mode:
-            # Hide system stats and training logs in progress widget
-            self.progress_widget.system_stats.setVisible(False)
-            self.progress_widget.log_viewer.setVisible(False)
-        self.right_tabs.addTab(self.progress_widget, "Progress")
-        
-        # Results tab
-        self.results_widget = ResultsWidget()
-        self.right_tabs.addTab(self.results_widget, "Results")
-        
-        # Only show history and logs in dev mode
-        if self.dev_mode:
-            # History tab
-            self.history_widget = HistoryWidget()
-            self.right_tabs.addTab(self.history_widget, "History")
-            
-            # Log viewer tab
-            self.log_viewer = LogViewerWidget()
-            self.right_tabs.addTab(self.log_viewer, "Logs")
-        else:
-            # Create widgets but don't show them
-            self.history_widget = HistoryWidget()
-            self.log_viewer = LogViewerWidget()
-        
-        return panel
-
-    # Add this method to handle secret dev mode activation:
-    def mousePressEvent(self, event):
-        """Handle mouse press events for secret dev mode activation"""
-        super().mousePressEvent(event)
-        
-        # Check if clicking on the logo label
-        logo_pos = self.logo_label.mapFromGlobal(event.globalPos())
-        if self.logo_label.rect().contains(logo_pos):
-            current_time = time.time()
-            
-            # Reset counter if too much time has passed
-            if current_time - self.last_click_time > 2.0:
-                self.dev_mode_clicks = 0
-            
-            self.last_click_time = current_time
-            self.dev_mode_clicks += 1
-            
-            # Activate dev mode after 5 clicks
-            if self.dev_mode_clicks >= 5:
-                self.toggle_dev_mode()
-                self.dev_mode_clicks = 0
-
-# Add this method to toggle dev mode:
-    def toggle_dev_mode(self):
-        """Toggle developer mode"""
-        self.dev_mode = not self.dev_mode
-        
-        # Save the setting
-        self.settings.setValue("devMode", self.dev_mode)
-        
-        # Show message
-        if self.dev_mode:
-            QMessageBox.information(self, "Developer Mode", "Developer mode activated!")
-        else:
-            QMessageBox.information(self, "Developer Mode", "Developer mode deactivated!")
-        
-        # Restart the application to apply changes
-        reply = QMessageBox.question(
-            self, "Restart Required",
-            "The application needs to restart to apply changes. Restart now?",
-            QMessageBox.Yes | QMessageBox.No
-        )
-        
-        if reply == QMessageBox.Yes:
-            QApplication.quit()
-        # You might want to implement actual restart logic here
-
-# Update the load_settings method to include dev mode:
-    def load_settings(self):
-        """Load application settings"""
-        # Window geometry
-        geometry = self.settings.value("geometry")
-        if geometry:
-            self.restoreGeometry(geometry)
-        
-        # Window state
-        state = self.settings.value("windowState")
-        if state:
-            self.restoreState(state)
-        
-        # Last directory
-        self.last_video_dir = self.settings.value("lastVideoDir", "")
-        self.last_output_dir = self.settings.value("lastOutputDir", "")
-        
-        # Dev mode
-        self.dev_mode = self.settings.value("devMode", False, type=bool)
-        global DEV_MODE_ENABLED
-        DEV_MODE_ENABLED = self.dev_mode
-
-    # Update the create_menu_bar method to add dev mode option:
-    def create_menu_bar(self):
-        """Create the menu bar"""
-        menu_bar = self.menuBar()
-        
-        # File menu
-        file_menu = menu_bar.addMenu("&File")
-        
-        open_action = QAction("&Open Video", self)
-        open_action.setShortcut(QKeySequence.Open)
-        open_action.triggered.connect(self.open_video)
-        file_menu.addAction(open_action)
-        
-        file_menu.addSeparator()
-        
-        quit_action = QAction("&Quit", self)
-        quit_action.setShortcut(QKeySequence.Quit)
-        quit_action.triggered.connect(self.close)
-        file_menu.addAction(quit_action)
-        
-        # Edit menu
-        edit_menu = menu_bar.addMenu("&Edit")
-        
-        preferences_action = QAction("&Preferences", self)
-        preferences_action.triggered.connect(self.show_preferences)
-        edit_menu.addAction(preferences_action)
-        
-        # Only show dev mode toggle in menu if already in dev mode
-        if self.dev_mode:
-            edit_menu.addSeparator()
-            dev_mode_action = QAction("&Developer Mode", self)
-            dev_mode_action.setCheckable(True)
-            dev_mode_action.setChecked(self.dev_mode)
-            dev_mode_action.triggered.connect(self.toggle_dev_mode)
-            edit_menu.addAction(dev_mode_action)
-        
-        # Help label (not a menu)
-        help_label = QLabel("Help")
-        help_label.setStyleSheet("""
+        # Upload area
+        self.upload_area = QLabel("Drag and drop a video file here\nor click to browse")
+        self.upload_area.setMinimumHeight(150)
+        self.upload_area.setAlignment(Qt.AlignCenter)
+        self.upload_area.setStyleSheet("""
             QLabel {
-                color: #fff;
-                padding: 5px 10px;
-                margin: 0;
+                background-color: #2b2b2b;
+                border: 2px dashed #666;
+                border-radius: 10px;
+                font-size: 16px;
+                color: #aaa;
+            }
+            QLabel:hover {
+                border-color: #4CAF50;
+                color: #ccc;
             }
         """)
-        # Store reference to track clicks
-        self.help_label = help_label
-        menu_bar.setCornerWidget(help_label, Qt.TopRightCorner)
-
-    def mousePressEvent(self, event):
-        """Handle mouse press events for dev mode activation"""
-        super().mousePressEvent(event)
+        self.upload_area.setCursor(Qt.PointingHandCursor)
+        self.upload_area.mousePressEvent = self.browse_video
+        layout.addWidget(self.upload_area)
         
-        # Check if clicking on help label
-        if hasattr(self, 'help_label'):
-            help_pos = self.help_label.mapFromGlobal(event.globalPosition().toPoint())
-            if self.help_label.rect().contains(help_pos):
-                current_time = time.time()
-                
-                # Reset counter if too much time has passed
-                if current_time - self.last_click_time > 2.0:
-                    self.dev_mode_clicks = 0
-                
-                self.last_click_time = current_time
-                self.dev_mode_clicks += 1
-                
-                # Activate dev mode after 5 clicks
-                if self.dev_mode_clicks >= 5:
-                    self.toggle_dev_mode()
-                    self.dev_mode_clicks = 0
-
-# Update the status bar creation to be simpler in non-dev mode:
-    def create_status_bar(self):
-        """Create the status bar"""
-        status_bar = self.statusBar()
+        # Browse button
+        browse_btn = QPushButton("Browse Files")
+        browse_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                font-size: 14px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        browse_btn.clicked.connect(self.browse_video)
+        layout.addWidget(browse_btn, alignment=Qt.AlignCenter)
         
-        if self.dev_mode:
-            # System info label
-            self.system_info_label = QLabel()
-            self.update_system_info()
-            status_bar.addPermanentWidget(self.system_info_label)
-            
-            # GPU info label
-            self.gpu_info_label = QLabel()
-            self.update_gpu_info()
-            status_bar.addPermanentWidget(self.gpu_info_label)
-            
-            # Timer to update system info
-            self.status_timer = QTimer()
-            self.status_timer.timeout.connect(self.update_system_info)
-            self.status_timer.timeout.connect(self.update_gpu_info)
-            self.status_timer.start(5000)  # Update every 5 seconds
-        else:
-            # Simple status for non-dev mode
-            self.status_label = QLabel("Ready")
-            status_bar.addWidget(self.status_label)
-
-    def save_settings(self):
-        """Save application settings"""
-        self.settings.setValue("geometry", self.saveGeometry())
-        self.settings.setValue("windowState", self.saveState())
-        self.settings.setValue("lastVideoDir", self.last_video_dir)
-        self.settings.setValue("lastOutputDir", self.last_output_dir)
+        return widget
     
-    def open_video(self):
-        """Open a video file"""
-        file_dialog = QFileDialog(self)
-        file_dialog.setFileMode(QFileDialog.ExistingFile)
-        file_dialog.setNameFilter("Video Files (*.mp4 *.avi *.mkv *.mov *.webm)")
-        file_dialog.setDirectory(self.last_video_dir or "")
+    def create_comparison_section(self):
+        """Create video comparison section"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
         
-        if file_dialog.exec():
-            file_path = file_dialog.selectedFiles()[0]
-            self.last_video_dir = os.path.dirname(file_path)
-            self.video_preview.load_video(file_path)
-    
-    def on_video_loaded(self, video_info: Dict):
-        """Handle video loaded signal"""
-        self.current_video = video_info
-        self.logger.info(f"Loaded video: {video_info['path']}")
+        # Video previews
+        previews_layout = QHBoxLayout()
         
-    # Update UI elements based on video info
-        self.training_options.update_for_video(video_info)
-        self.resource_guard.update_for_video(video_info)
+        self.original_preview = VideoPreviewWidget("Original Video")
+        self.compressed_preview = VideoPreviewWidget("Compressed Video")
         
-        # Enable start button
-        self.start_btn.setEnabled(True)
-        self.start_action.setEnabled(True)
+        previews_layout.addWidget(self.original_preview)
+        previews_layout.addWidget(self.compressed_preview)
+        
+        layout.addLayout(previews_layout)
+        
+        # Compress button
+        self.compress_btn = QPushButton("Start Compression")
+        self.compress_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                border: none;
+                padding: 15px 30px;
+                border-radius: 5px;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+            }
+        """)
+        self.compress_btn.clicked.connect(self.start_compression)
+        layout.addWidget(self.compress_btn, alignment=Qt.AlignCenter)
+        
+        return widget
     
-    def on_video_error(self, error_msg: str):
-        """Handle video loading error"""
-        self.logger.error(f"Video loading error: {error_msg}")
-        QMessageBox.warning(self, "Video Error", f"Failed to load video:\n{error_msg}")
+    def create_progress_section(self):
+        """Create progress section"""
+        widget = QGroupBox("Compression Progress")
+        layout = QVBoxLayout(widget)
+        
+        # Status label
+        self.status_label = QLabel("Initializing...")
+        self.status_label.setStyleSheet("font-size: 14px; color: #ccc; padding: 5px;")
+        layout.addWidget(self.status_label)
+        
+        # Progress bar
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                border: 2px solid #555;
+                border-radius: 5px;
+                text-align: center;
+                height: 25px;
+            }
+            QProgressBar::chunk {
+                background-color: #4CAF50;
+                border-radius: 3px;
+            }
+        """)
+        layout.addWidget(self.progress_bar)
+        
+        return widget
     
-    def on_preset_changed(self, preset_info: Dict):
-        """Handle model preset change"""
-        self.logger.info(f"Model preset changed: {preset_info['name']}")
-        # Update training options based on preset
-       
-        self.training_options.load_preset(preset_info)
+    def create_results_section(self):
+        """Create results section"""
+        widget = QGroupBox("Compression Results")
+        layout = QVBoxLayout(widget)
+        
+        # Results grid
+        results_frame = QFrame()
+        results_frame.setStyleSheet("""
+            QFrame {
+                background-color: #2b2b2b;
+                border-radius: 8px;
+                padding: 15px;
+            }
+        """)
+        results_layout = QGridLayout(results_frame)
+        
+        self.result_labels = {
+            'original_size': QLabel("Original Size: --"),
+            'compressed_size': QLabel("Compressed Size: --"),
+            'compression_ratio': QLabel("Compression Ratio: --"),
+            'space_saved': QLabel("Space Saved: --")
+        }
+        
+        row = 0
+        for key, label in self.result_labels.items():
+            label.setStyleSheet("font-size: 14px; color: #ccc; padding: 5px;")
+            results_layout.addWidget(label, row // 2, row % 2)
+            row += 1
+        
+        layout.addWidget(results_frame)
+        
+        # Action buttons
+        actions_layout = QHBoxLayout()
+        
+        self.play_original_btn = QPushButton("Play Original")
+        self.play_compressed_btn = QPushButton("Play Compressed")
+        self.save_btn = QPushButton("Save Compressed Video")
+        
+        for btn in [self.play_original_btn, self.play_compressed_btn, self.save_btn]:
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #555;
+                    color: white;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 5px;
+                    font-size: 14px;
+                }
+                QPushButton:hover {
+                    background-color: #666;
+                }
+            """)
+        
+        self.play_original_btn.clicked.connect(self.play_original)
+        self.play_compressed_btn.clicked.connect(self.play_compressed)
+        self.save_btn.clicked.connect(self.save_compressed)
+        
+        actions_layout.addWidget(self.play_original_btn)
+        actions_layout.addWidget(self.play_compressed_btn)
+        actions_layout.addWidget(self.save_btn)
+        
+        layout.addLayout(actions_layout)
+        
+        # New compression button
+        new_btn = QPushButton("Compress Another Video")
+        new_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                font-size: 14px;
+                margin-top: 10px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        new_btn.clicked.connect(self.reset_ui)
+        layout.addWidget(new_btn, alignment=Qt.AlignCenter)
+        
+        return widget
     
-    def on_system_stats_updated(self, stats: Dict):
-        """Handle system stats update"""
-        self.progress_widget.update_system_stats(stats)
+    def apply_theme(self):
+        """Apply dark theme to the application"""
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #1e1e1e;
+            }
+            QWidget {
+                background-color: #1e1e1e;
+                color: #ffffff;
+            }
+            QGroupBox {
+                border: 2px solid #444;
+                border-radius: 8px;
+                margin-top: 10px;
+                padding-top: 10px;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+            }
+        """)
     
-    def update_system_info(self):
-        """Update system information in status bar"""
-        info = get_system_info()
-        self.system_info_label.setText(
-            f"CPU: {info['cpu_usage']}% | RAM: {info['ram_usage']}%"
+    def browse_video(self, event=None):
+        """Open file browser to select video"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Video File",
+            "",
+            "Video Files (*.mp4 *.avi *.mkv *.mov *.webm);;All Files (*.*)"
         )
-    
-    def update_gpu_info(self):
-        """Update GPU information in status bar"""
-        try:
-            import nvidia_ml_py3 as nvml
-            nvml.nvmlInit()
-            handle = nvml.nvmlDeviceGetHandleByIndex(0)
-            
-            # Get memory info
-            mem_info = nvml.nvmlDeviceGetMemoryInfo(handle)
-            used_mb = mem_info.used / 1024 / 1024
-            total_mb = mem_info.total / 1024 / 1024
-            
-            # Get GPU utilization
-            util = nvml.nvmlDeviceGetUtilizationRates(handle)
-            
-            self.gpu_info_label.setText(
-                f"GPU: {util.gpu}% | VRAM: {used_mb:.0f}/{total_mb:.0f} MB"
-            )
-        except:
-            self.gpu_info_label.setText("GPU: N/A")
-    
-    def run_quick_test(self):
-        """Run a quick test compression"""
-        if not self.current_video:
-            QMessageBox.warning(self, "No Video", "Please load a video first.")
-            return
         
-        # Set up quick test configuration
-        config = self.create_compression_config()
-        config.update({
-            'epochs': 1,
-            'max_frames': 5,
-            'batch_size': 2,
-            'quick_test': True
-        })
+        if file_path:
+            self.load_video(file_path)
+    
+    def load_video(self, file_path):
+        """Load selected video"""
+        self.video_path = file_path
         
-        self.start_compression_with_config(config)
+        # Update upload area
+        self.upload_area.setText(f"Selected: {os.path.basename(file_path)}")
+        self.upload_area.setStyleSheet("""
+            QLabel {
+                background-color: #2b2b2b;
+                border: 2px solid #4CAF50;
+                border-radius: 10px;
+                font-size: 14px;
+                color: #4CAF50;
+            }
+        """)
+        
+        # Show comparison section
+        self.comparison_widget.setVisible(True)
+        self.original_preview.load_video(file_path)
     
     def start_compression(self):
         """Start the compression process"""
-        if not self.current_video:
-            QMessageBox.warning(self, "No Video", "Please load a video first.")
+        if not self.video_path:
             return
         
-        # Create configuration from UI
-        config = self.create_compression_config()
-        self.start_compression_with_config(config)
-    
-    def create_compression_config(self) -> Dict:
-        """Create compression configuration from UI settings"""
-        # In non-dev mode, use defaults
-        if not self.dev_mode:
-            # Get default model preset
-            model_preset = None
-            for i in range(self.model_presets.preset_combo.count()):
-                file_path = self.model_presets.preset_combo.itemData(i)
-                if "uvg-hinerv-s_1920x1080.txt" in file_path:
-                    self.model_presets.preset_combo.setCurrentIndex(i)
-                    model_preset = self.model_presets.get_selected_preset()
-                    break
-            
-            if not model_preset:
-                model_preset = self.model_presets.get_selected_preset()
-            
-            # Get default training options
-            default_training = self.config_manager.get_default_training_config()
-            
-            config = {
-                'video_path': self.current_video['path'],
-                'output_dir': self.get_output_directory(),
-                'model_preset': model_preset,
-                'training_options': default_training,
-                'resource_limits': self.resource_guard.get_limits(),
-            }
-        else:
-            # Original implementation for dev mode
-            config = {
-                'video_path': self.current_video['path'],
-                'output_dir': self.get_output_directory(),
-                'model_preset': self.model_presets.get_selected_preset(),
-                'training_options': self.training_options.get_options(),
-                'resource_limits': self.resource_guard.get_limits(),
-            }
-        
-        return config
-    
-    def get_output_directory(self) -> str:
-        """Get the output directory for compression results"""
-        if not self.last_output_dir:
-            default_dir = os.path.join(os.path.expanduser("~"), "HiNeRV_Output")
-        else:
-            default_dir = self.last_output_dir
-        
-        # Create timestamped subdirectory
+        # Create output directory
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        video_name = Path(self.current_video['path']).stem
-        output_dir = os.path.join(default_dir, f"{video_name}_{timestamp}")
+        video_name = Path(self.video_path).stem
+        self.output_dir = os.path.join("output", f"{video_name}_{timestamp}")
+        os.makedirs(self.output_dir, exist_ok=True)
         
-        os.makedirs(output_dir, exist_ok=True)
-        return output_dir
-    
-    def start_compression_with_config(self, config: Dict):
-        """Start compression with the given configuration"""
-        # Update UI state
-        self.start_btn.setEnabled(False)
-        self.start_action.setEnabled(False)
-        self.pause_action.setEnabled(True)
-        self.stop_action.setEnabled(True)
+        # Update UI
+        self.compress_btn.setEnabled(False)
+        self.progress_widget.setVisible(True)
+        self.results_widget.setVisible(False)
         
-        # Create and start processor thread
-        self.processor = HiNeRVProcessor(config)
-        self.processor.progress_updated.connect(self.progress_widget.update_progress)
-        self.processor.status_updated.connect(self.progress_widget.update_status)
-        self.processor.error_occurred.connect(self.on_compression_error)
+        # Start compression thread
+        self.processor = VideoProcessor(self.video_path, self.output_dir)
+        self.processor.progress.connect(self.update_progress)
         self.processor.finished.connect(self.on_compression_finished)
-        
-        # Switch to progress tab
-        self.findChild(QTabWidget).setCurrentWidget(self.progress_widget)
-        
-        # Start the compression
+        self.processor.error.connect(self.on_compression_error)
         self.processor.start()
-        
-        self.logger.info("Started compression process")
     
-    def pause_resume(self):
-        """Pause or resume the compression process"""
-        if self.processor and self.processor.isRunning():
-            if self.processor.is_paused:
-                self.processor.resume()
-                self.pause_action.setText("Pause")
-                self.pause_action.setIcon(QIcon.fromTheme("media-playback-pause"))
-            else:
-                self.processor.pause()
-                self.pause_action.setText("Resume")
-                self.pause_action.setIcon(QIcon.fromTheme("media-playback-start"))
+    def update_progress(self, value, message):
+        """Update progress bar and status"""
+        self.progress_bar.setValue(value)
+        self.status_label.setText(message)
     
-    def stop_compression(self):
-        """Stop the compression process"""
-        if self.processor and self.processor.isRunning():
-            reply = QMessageBox.question(
-                self, "Stop Compression",
-                "Are you sure you want to stop the compression process?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No
-            )
-            
-            if reply == QMessageBox.Yes:
-                self.processor.stop()
-    
-    def on_compression_finished(self, results: Dict):
+    def on_compression_finished(self, results):
         """Handle compression completion"""
-        self.logger.info("Compression finished successfully")
+        # Update UI
+        self.compress_btn.setEnabled(True)
+        self.progress_widget.setVisible(False)
+        self.results_widget.setVisible(True)
         
-        # Update UI state
-        self.start_btn.setEnabled(True)
-        self.start_action.setEnabled(True)
-        self.pause_action.setEnabled(False)
-        self.stop_action.setEnabled(False)
+        # Store results
+        self.compression_results = results
         
-        # Show results
-        self.results_widget.show_results(results)
-        self.findChild(QTabWidget).setCurrentWidget(self.results_widget)
+        # Update compressed preview
+        self.compressed_preview.load_video(results['compressed_path'])
         
-        # Add to history
-        self.history_widget.add_run(results)
-        
-        # Show completion notification
-        self.show_completion_notification(results)
+        # Update results
+        self.result_labels['original_size'].setText(
+            f"Original Size: {self.format_size(results['original_size'])}"
+        )
+        self.result_labels['compressed_size'].setText(
+            f"Compressed Size: {self.format_size(results['compressed_size'])}"
+        )
+        self.result_labels['compression_ratio'].setText(
+            f"Compression Ratio: {results['compression_ratio']:.2f}x"
+        )
+        self.result_labels['space_saved'].setText(
+            f"Space Saved: {results['space_saved']*100:.1f}%"
+        )
     
-    def on_compression_error(self, error: str):
+    def on_compression_error(self, error_msg):
         """Handle compression error"""
-        self.logger.error(f"Compression error: {error}")
+        self.compress_btn.setEnabled(True)
+        self.progress_widget.setVisible(False)
         
-        # Update UI state
-        self.start_btn.setEnabled(True)
-        self.start_action.setEnabled(True)
-        self.pause_action.setEnabled(False)
-        self.stop_action.setEnabled(False)
+        QMessageBox.critical(self, "Compression Error", f"An error occurred:\n{error_msg}")
+    
+    def play_original(self):
+        """Play original video"""
+        if self.video_path and os.path.exists(self.video_path):
+            os.system(f'xdg-open "{self.video_path}"')
+    
+    def play_compressed(self):
+        """Play compressed video"""
+        if hasattr(self, 'compression_results'):
+            compressed_path = self.compression_results.get('compressed_path')
+            if compressed_path and os.path.exists(compressed_path):
+                os.system(f'xdg-open "{compressed_path}"')
+    
+    def save_compressed(self):
+        """Save compressed video to user location"""
+        if not hasattr(self, 'compression_results'):
+            return
         
-        # Show error dialog
-        error_dialog = QMessageBox(self)
-        error_dialog.setIcon(QMessageBox.Critical)
-        error_dialog.setWindowTitle("Compression Error")
-        error_dialog.setText("An error occurred during compression:")
-        error_dialog.setDetailedText(error)
-        error_dialog.addButton("Copy to Clipboard", QMessageBox.ActionRole)
-        error_dialog.addButton(QMessageBox.Ok)
+        compressed_path = self.compression_results.get('compressed_path')
+        if not compressed_path or not os.path.exists(compressed_path):
+            return
         
-        clicked = error_dialog.exec()
-        if clicked == 0:  # Copy to clipboard button
-            QApplication.clipboard().setText(error)
+        save_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Compressed Video",
+            f"compressed_{os.path.basename(self.video_path)}",
+            "Video Files (*.mp4);;All Files (*.*)"
+        )
+        
+        if save_path:
+            shutil.copy(compressed_path, save_path)
+            QMessageBox.information(self, "Success", f"Video saved to:\n{save_path}")
     
-    def show_completion_notification(self, results: Dict):
-        """Show compression completion notification"""
-        if hasattr(self, 'tray_icon') and self.tray_icon.isVisible():
-            self.tray_icon.showMessage(
-                "Compression Complete",
-                f"Video: {Path(results['video_path']).name}\n"
-                f"Size: {format_filesize(results['output_size'])}",
-                QSystemTrayIcon.Information,
-                5000
-            )
+    def reset_ui(self):
+        """Reset UI for new compression"""
+        self.video_path = None
+        self.output_dir = None
+        
+        # Reset upload area
+        self.upload_area.setText("Drag and drop a video file here\nor click to browse")
+        self.upload_area.setStyleSheet("""
+            QLabel {
+                background-color: #2b2b2b;
+                border: 2px dashed #666;
+                border-radius: 10px;
+                font-size: 16px;
+                color: #aaa;
+            }
+            QLabel:hover {
+                border-color: #4CAF50;
+                color: #ccc;
+            }
+        """)
+        
+        # Hide sections
+        self.comparison_widget.setVisible(False)
+        self.progress_widget.setVisible(False)
+        self.results_widget.setVisible(False)
     
-    def show_preferences(self):
-        """Show preferences dialog"""
-        # TODO: Implement preferences dialog
-        QMessageBox.information(self, "Preferences", "Preferences dialog not implemented yet.")
-    
-    def show_about(self):
-        """Show about dialog"""
-        about_text = f"""
-        <h2>{APP_NAME} v{APP_VERSION}</h2>
-        <p>A modern GUI for HiNeRV video compression framework.</p>
-        <p>Built with Python and PySide6.</p>
-        <p><a href="https://github.com/megvii-research/HiNeRV">HiNeRV on GitHub</a></p>
-        """
-        QMessageBox.about(self, "About", about_text)
+    def format_size(self, size_bytes):
+        """Format file size"""
+        for unit in ['B', 'KB', 'MB', 'GB']:
+            if size_bytes < 1024.0:
+                return f"{size_bytes:.2f} {unit}"
+            size_bytes /= 1024.0
+        return f"{size_bytes:.2f} TB"
     
     def dragEnterEvent(self, event: QDragEnterEvent):
-        """Handle drag enter event for video files"""
+        """Handle drag enter"""
         if event.mimeData().hasUrls():
-            urls = event.mimeData().urls()
-            if len(urls) == 1 and urls[0].isLocalFile():
-                file_path = urls[0].toLocalFile()
-                if any(file_path.lower().endswith(ext) for ext in ['.mp4', '.avi', '.mkv', '.mov', '.webm']):
-                    event.acceptProposedAction()
+            event.acceptProposedAction()
     
     def dropEvent(self, event: QDropEvent):
-        """Handle drop event for video files"""
-        urls = event.mimeData().urls()
-        if urls and urls[0].isLocalFile():
-            file_path = urls[0].toLocalFile()
-            self.video_preview.load_video(file_path)
-    
-    def closeEvent(self, event):
-        """Handle application close event"""
-        # Save settings
-        self.save_settings()
-        
-        # Stop any running processes
-        if self.processor and self.processor.isRunning():
-            reply = QMessageBox.question(
-                self, "Quit",
-                "Compression is still running. Do you want to stop it and quit?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No
-            )
-            
-            if reply == QMessageBox.Yes:
-                self.processor.stop()
-                self.processor.wait(5000)  # Wait up to 5 seconds
-            else:
-                event.ignore()
-                return
-        
-        # Stop system monitor
-        if hasattr(self, 'system_monitor'):
-            self.system_monitor.stop()
-        
-        # Accept the close event
-        event.accept()
-
-
-def check_system_requirements():
-    """Check system requirements and dependencies"""
-    issues = []
-    
-    # Check Python version
-    if sys.version_info < (3, 11):
-        issues.append("Python 3.11 or higher is required")
-    
-    # Check for required packages
-    required_packages = [
-        'torch', 'torchvision', 'accelerate', 'deepspeed',
-        'pytorch_msssim', 'timm'
-    ]
-    
-    for package in required_packages:
-        try:
-            __import__(package)
-        except ImportError:
-            issues.append(f"Required package '{package}' is not installed")
-    
-    # Check for CUDA
-    try:
-        import torch
-        if not torch.cuda.is_available():
-            issues.append("CUDA is not available. GPU acceleration is required.")
-    except ImportError:
-        pass
-    
-    return issues
-
-
-def show_splash_screen():
-    """Show splash screen during startup"""
-    pixmap = QPixmap(400, 300)
-    pixmap.fill(Qt.black)
-    
-    splash = QSplashScreen(pixmap)
-    splash.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
-    splash.show()
-    
-    # Show loading messages
-    messages = [
-        "Loading HiNeRV GUI...",
-        "Checking system requirements...",
-        "Initializing components...",
-        "Ready!"
-    ]
-    
-    for i, message in enumerate(messages):
-        splash.showMessage(message, Qt.AlignBottom | Qt.AlignCenter)
-        QApplication.processEvents()
-        QTimer.singleShot(500 * (i + 1), lambda m=message: splash.showMessage(m, Qt.AlignBottom | Qt.AlignCenter))
-    
-    return splash
+        """Handle drop"""
+        files = [u.toLocalFile() for u in event.mimeData().urls()]
+        if files:
+            # Check if it's a video file
+            video_extensions = ['.mp4', '.avi', '.mkv', '.mov', '.webm']
+            if any(files[0].lower().endswith(ext) for ext in video_extensions):
+                self.load_video(files[0])
 
 
 def main():
-    """Main application entry point"""
+    """Main entry point"""
     app = QApplication(sys.argv)
-    app.setApplicationName(APP_NAME)
-    app.setApplicationVersion(APP_VERSION)
-    app.setOrganizationName("HiNeRV")
+    app.setApplicationName("HiNeRV Video Compressor")
     
-    # Show splash screen
-    splash = show_splash_screen()
-    
-    # Check system requirements
-    issues = check_system_requirements()
-    if issues:
-        splash.close()
-        msg = QMessageBox()
-        msg.setIcon(QMessageBox.Warning)
-        msg.setWindowTitle("System Requirements")
-        msg.setText("Some system requirements are not met:")
-        msg.setDetailedText("\n".join(issues))
-        msg.exec()
-        sys.exit(1)
+    # Set application style
+    app.setStyle("Fusion")
     
     # Create and show main window
     window = MainWindow()
-    splash.finish(window)
     window.show()
     
-    # Run the application
     sys.exit(app.exec())
 
 

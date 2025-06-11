@@ -112,34 +112,55 @@ class VideoProcessor(QThread):
         gui_dir = Path(__file__).parent
         hinerv_root = gui_dir.parent
         
+        # Log paths for debugging
+        logger.info(f"GUI directory: {gui_dir}")
+        logger.info(f"HiNeRV root directory: {hinerv_root}")
+        logger.info(f"Frames directory: {frames_dir}")
+        
         # Prepare paths
         dataset_dir = os.path.dirname(frames_dir)
         dataset_name = os.path.basename(frames_dir)
         model_output = os.path.join(self.output_dir, "model")
         
+        # Create model output directory
+        os.makedirs(model_output, exist_ok=True)
+        
         # Read config files
         train_cfg_path = hinerv_root / "cfgs" / "train" / "hinerv_1920x1080.txt"
         model_cfg_path = hinerv_root / "cfgs" / "models" / "uvg-hinerv-s_1920x1080.txt"
+        
+        # Check if config files exist
+        if not train_cfg_path.exists():
+            raise FileNotFoundError(f"Training config not found: {train_cfg_path}")
+        if not model_cfg_path.exists():
+            raise FileNotFoundError(f"Model config not found: {model_cfg_path}")
+        
+        # Check if hinerv_main.py exists
+        hinerv_main_path = hinerv_root / "hinerv_main.py"
+        if not hinerv_main_path.exists():
+            raise FileNotFoundError(f"hinerv_main.py not found: {hinerv_main_path}")
         
         # Build command
         cmd = [
             "accelerate", "launch",
             "--mixed_precision=fp16",
             "--dynamo_backend=inductor",
-            str(hinerv_root / "hinerv_main.py"),
+            str(hinerv_main_path),
             "--dataset", dataset_dir,
             "--dataset-name", dataset_name,
             "--output", model_output
         ]
         
         # Add config file contents
-        if train_cfg_path.exists():
-            with open(train_cfg_path, 'r') as f:
-                cmd.extend(f.read().split())
+        with open(train_cfg_path, 'r') as f:
+            train_config = f.read().strip()
+            if train_config:
+                cmd.extend(train_config.split())
         
-        if model_cfg_path.exists():
-            with open(model_cfg_path, 'r') as f:
-                cmd.extend(f.read().split())
+        with open(model_cfg_path, 'r') as f:
+            model_config = f.read().strip()
+            if model_config:
+                cmd.extend(model_config.split())
         
         # Add runtime parameters
         cmd.extend([
@@ -150,25 +171,48 @@ class VideoProcessor(QThread):
             "--seed", "0"
         ])
         
+        # Log the full command for debugging
+        logger.info(f"Running command: {' '.join(cmd)}")
+        logger.info(f"Working directory: {hinerv_root}")
+        
+        # Create log file for training output
+        log_file_path = os.path.join(self.output_dir, "training_log.txt")
+        
         # Run training
-        logger.info(f"Running HiNeRV training...")
-        process = subprocess.Popen(
-            cmd,
-            cwd=str(hinerv_root),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            universal_newlines=True
-        )
-        
-        # Monitor progress
-        for line in process.stdout:
-            if "Epoch" in line:
-                # Update progress based on epoch info
-                self.progress.emit(50, f"Training... {line.strip()}")
-        
-        process.wait()
-        if process.returncode != 0:
-            raise RuntimeError("Training failed")
+        with open(log_file_path, 'w') as log_file:
+            process = subprocess.Popen(
+                cmd,
+                cwd=str(hinerv_root),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                universal_newlines=True,
+                env=os.environ.copy()
+            )
+            
+            # Monitor progress and collect output
+            output_lines = []
+            for line in process.stdout:
+                output_lines.append(line)
+                log_file.write(line)
+                log_file.flush()
+                
+                # Log important lines
+                if "Error" in line or "error" in line:
+                    logger.error(f"Training error: {line.strip()}")
+                elif "Epoch" in line:
+                    # Update progress based on epoch info
+                    self.progress.emit(50, f"Training... {line.strip()}")
+                    logger.info(f"Training progress: {line.strip()}")
+            
+            process.wait()
+            
+            if process.returncode != 0:
+                # Get last 20 lines of output for error message
+                error_lines = output_lines[-20:] if len(output_lines) > 20 else output_lines
+                error_msg = "Training failed. Last output:\n" + "".join(error_lines)
+                logger.error(f"Training failed with return code {process.returncode}")
+                logger.error(f"Full log saved to: {log_file_path}")
+                raise RuntimeError(error_msg)
     
     def generate_output(self):
         """Generate compressed video from model"""
@@ -701,7 +745,20 @@ class MainWindow(QMainWindow):
         self.compress_btn.setEnabled(True)
         self.progress_widget.setVisible(False)
         
-        QMessageBox.critical(self, "Compression Error", f"An error occurred:\n{error_msg}")
+        # Check if there's a log file we can point to
+        log_file_hint = ""
+        if self.output_dir:
+            log_file = os.path.join(self.output_dir, "training_log.txt")
+            if os.path.exists(log_file):
+                log_file_hint = f"\n\nDetailed log saved to:\n{log_file}"
+        
+        # Create detailed error dialog
+        error_dialog = QMessageBox(self)
+        error_dialog.setWindowTitle("Compression Error")
+        error_dialog.setText("An error occurred during compression:")
+        error_dialog.setDetailedText(error_msg + log_file_hint)
+        error_dialog.setIcon(QMessageBox.Critical)
+        error_dialog.exec()
     
     def play_original(self):
         """Play original video"""

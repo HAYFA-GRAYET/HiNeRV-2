@@ -55,7 +55,7 @@ class VideoProcessor(QThread):
     def __init__(self, video_path, output_dir):
         super().__init__()
         self.video_path = video_path
-        self.output_dir = output_dir
+        self.output_dir = os.path.abspath(output_dir)  # Convert to absolute path
         self.is_running = True
         
     def run(self):
@@ -112,18 +112,22 @@ class VideoProcessor(QThread):
         gui_dir = Path(__file__).parent
         hinerv_root = gui_dir.parent
         
+        # Convert frames_dir to absolute path
+        frames_dir_abs = os.path.abspath(frames_dir)
+        
         # Log paths for debugging
         logger.info(f"GUI directory: {gui_dir}")
         logger.info(f"HiNeRV root directory: {hinerv_root}")
-        logger.info(f"Frames directory: {frames_dir}")
+        logger.info(f"Frames directory (absolute): {frames_dir_abs}")
         
-        # Prepare paths
-        dataset_dir = os.path.dirname(frames_dir)
-        dataset_name = os.path.basename(frames_dir)
+        # Prepare paths - use absolute paths
+        dataset_dir = os.path.dirname(frames_dir_abs)
+        dataset_name = os.path.basename(frames_dir_abs)
         model_output = os.path.join(self.output_dir, "model")
+        model_output_abs = os.path.abspath(model_output)
         
         # Create model output directory
-        os.makedirs(model_output, exist_ok=True)
+        os.makedirs(model_output_abs, exist_ok=True)
         
         # Read config files
         train_cfg_path = hinerv_root / "cfgs" / "train" / "hinerv_1920x1080.txt"
@@ -140,7 +144,7 @@ class VideoProcessor(QThread):
         if not hinerv_main_path.exists():
             raise FileNotFoundError(f"hinerv_main.py not found: {hinerv_main_path}")
         
-        # Build command
+        # Build command with absolute paths
         cmd = [
             "accelerate", "launch",
             "--mixed_precision=fp16",
@@ -148,7 +152,7 @@ class VideoProcessor(QThread):
             str(hinerv_main_path),
             "--dataset", dataset_dir,
             "--dataset-name", dataset_name,
-            "--output", model_output
+            "--output", model_output_abs
         ]
         
         # Add config file contents
@@ -690,19 +694,22 @@ class MainWindow(QMainWindow):
         if not self.video_path:
             return
         
-        # Create output directory
+        # Create output directory with absolute path
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         video_name = Path(self.video_path).stem
-        self.output_dir = os.path.join("output", f"{video_name}_{timestamp}")
-        os.makedirs(self.output_dir, exist_ok=True)
+        
+        # Create output in GUI directory
+        gui_dir = Path(__file__).parent
+        self.output_dir = gui_dir / "output" / f"{video_name}_{timestamp}"
+        self.output_dir.mkdir(parents=True, exist_ok=True)
         
         # Update UI
         self.compress_btn.setEnabled(False)
         self.progress_widget.setVisible(True)
         self.results_widget.setVisible(False)
         
-        # Start compression thread
-        self.processor = VideoProcessor(self.video_path, self.output_dir)
+        # Start compression thread with absolute paths
+        self.processor = VideoProcessor(str(self.video_path), str(self.output_dir))
         self.processor.progress.connect(self.update_progress)
         self.processor.finished.connect(self.on_compression_finished)
         self.processor.error.connect(self.on_compression_error)

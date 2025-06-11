@@ -131,7 +131,7 @@ class VideoProcessor(QThread):
         
         # Read config files
         train_cfg_path = hinerv_root / "cfgs" / "train" / "hinerv_1280x720.txt"
-        model_cfg_path = hinerv_root / "cfgs" / "models" / "uvg-hinerv-s_1280x720.txt"
+        model_cfg_path = hinerv_root / "cfgs" / "models" / "bunny-hinerv-s_1280x720.txt"
         
         # Check if config files exist
         if not train_cfg_path.exists():

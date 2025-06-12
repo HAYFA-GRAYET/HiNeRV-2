@@ -203,8 +203,8 @@ class VideoProcessor(QThread):
         os.makedirs(model_output, exist_ok=True)
         
         # Read config files
-        train_cfg_path = hinerv_root / "cfgs" / "train" / "hinerv_1280x720.txt"
-        model_cfg_path = hinerv_root / "cfgs" / "models" / "bunny-hinerv-s_1280x720.txt"
+        train_cfg_path = hinerv_root / "cfgs" / "train" / "hinerv_1920x1080.txt"
+        model_cfg_path = hinerv_root / "cfgs" / "models" / "uvg-hinerv-s_1920x1080.txt"
         
         # Check if config files exist
         if not train_cfg_path.exists():

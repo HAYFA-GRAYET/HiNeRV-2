@@ -246,7 +246,7 @@ class VideoProcessor(QThread):
             "--grad-accum", "1",
             "--log-eval", "true",
             "--seed", str(batch_idx),  # Different seed for each batch
-            "--epochs", "50"  # Fewer epochs for faster processing
+            
         ])
         
         logger.info(f"Training batch {batch_idx} with command: {' '.join(cmd)}")

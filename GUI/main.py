@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-HiNeRV Video Compressor - Modern Minimal GUI
-A clean, user-friendly interface for video compression using HiNeRV
+HiNeRV Video Compressor - Modern Minimal GUI with Batch Processing
+A clean, user-friendly interface for video compression using HiNeRV with batch processing
 """
 
 import os
@@ -14,6 +14,8 @@ import logging
 from pathlib import Path
 from datetime import datetime
 import time
+import glob
+import math
 
 # Qt imports
 from PySide6.QtWidgets import (
@@ -46,34 +48,66 @@ class VideoInfo:
 
 
 class VideoProcessor(QThread):
-    """Background thread for video compression"""
+    """Background thread for video compression with batch processing"""
     
     progress = Signal(int, str)  # progress percentage, status message
     finished = Signal(dict)  # compression results
     error = Signal(str)  # error message
     
-    def __init__(self, video_path, output_dir):
+    def __init__(self, video_path, output_dir, batch_size=40):
         super().__init__()
         self.video_path = video_path
-        self.output_dir = os.path.abspath(output_dir)  # Convert to absolute path
+        self.output_dir = os.path.abspath(output_dir)
+        self.batch_size = batch_size
         self.is_running = True
         
     def run(self):
-        """Main compression pipeline"""
+        """Main compression pipeline with batch processing"""
         try:
             # Step 1: Extract frames
-            self.progress.emit(10, "Extracting video frames...")
+            self.progress.emit(5, "Extracting video frames...")
             frames_dir = self.extract_frames()
             
-            # Step 2: Process in batches
-            self.progress.emit(30, "Training compression model...")
-            self.train_model(frames_dir)
+            # Step 2: Get total frame count and calculate batches
+            frame_files = sorted(glob.glob(os.path.join(frames_dir, "*.png")))
+            total_frames = len(frame_files)
+            total_batches = math.ceil(total_frames / self.batch_size)
             
-            # Step 3: Generate compressed video
-            self.progress.emit(80, "Generating compressed video...")
-            compressed_path = self.generate_output()
+            self.progress.emit(10, f"Processing {total_frames} frames in {total_batches} batches...")
+            logger.info(f"Total frames: {total_frames}, Batches: {total_batches}, Batch size: {self.batch_size}")
             
-            # Step 4: Calculate results
+            # Step 3: Process frames in batches
+            output_frames_dir = os.path.join(self.output_dir, "compressed_frames")
+            os.makedirs(output_frames_dir, exist_ok=True)
+            
+            for batch_idx in range(total_batches):
+                if not self.is_running:
+                    break
+                    
+                # Calculate progress for this batch (10% to 80% of total progress)
+                batch_progress_start = 10 + int((batch_idx / total_batches) * 70)
+                batch_progress_end = 10 + int(((batch_idx + 1) / total_batches) * 70)
+                
+                self.progress.emit(
+                    batch_progress_start, 
+                    f"Processing batch {batch_idx + 1}/{total_batches}..."
+                )
+                
+                # Process this batch
+                self.process_batch(
+                    frames_dir, 
+                    batch_idx, 
+                    total_batches,
+                    output_frames_dir,
+                    batch_progress_start,
+                    batch_progress_end
+                )
+            
+            # Step 4: Combine all compressed frames into video
+            self.progress.emit(85, "Combining compressed frames into video...")
+            compressed_path = self.create_final_video(output_frames_dir)
+            
+            # Step 5: Calculate results
             self.progress.emit(95, "Calculating compression metrics...")
             results = self.calculate_results(compressed_path)
             
@@ -86,13 +120,8 @@ class VideoProcessor(QThread):
     
     def extract_frames(self):
         """Extract frames from video"""
-        frames_dir = os.path.join(self.output_dir, "frames")
+        frames_dir = os.path.join(self.output_dir, "original_frames")
         os.makedirs(frames_dir, exist_ok=True)
-        
-        # Get video info
-        cap = cv2.VideoCapture(self.video_path)
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        cap.release()
         
         # Extract frames using ffmpeg
         cmd = [
@@ -102,32 +131,76 @@ class VideoProcessor(QThread):
         ]
         
         subprocess.run(cmd, check=True, capture_output=True)
-        logger.info(f"Extracted {total_frames} frames to {frames_dir}")
+        
+        # Count extracted frames
+        frame_files = glob.glob(os.path.join(frames_dir, "*.png"))
+        logger.info(f"Extracted {len(frame_files)} frames to {frames_dir}")
         
         return frames_dir
     
-    def train_model(self, frames_dir):
-        """Train HiNeRV model on extracted frames"""
-        # Get HiNeRV root directory (parent of GUI directory)
+    def process_batch(self, frames_dir, batch_idx, total_batches, output_frames_dir, progress_start, progress_end):
+        """Process a single batch of frames"""
+        try:
+            # Get frame files for this batch
+            all_frame_files = sorted(glob.glob(os.path.join(frames_dir, "*.png")))
+            start_idx = batch_idx * self.batch_size
+            end_idx = min(start_idx + self.batch_size, len(all_frame_files))
+            batch_frame_files = all_frame_files[start_idx:end_idx]
+            
+            if not batch_frame_files:
+                logger.warning(f"No frames found for batch {batch_idx}")
+                return
+            
+            logger.info(f"Processing batch {batch_idx + 1}/{total_batches}: frames {start_idx + 1}-{end_idx}")
+            
+            # Create batch directory
+            batch_dir = os.path.join(self.output_dir, f"batch_{batch_idx:03d}")
+            batch_frames_dir = os.path.join(batch_dir, "frames")
+            os.makedirs(batch_frames_dir, exist_ok=True)
+            
+            # Copy batch frames to batch directory (renumbered from 1)
+            for i, frame_file in enumerate(batch_frame_files):
+                src = frame_file
+                dst = os.path.join(batch_frames_dir, f"{i+1:06d}.png")
+                shutil.copy2(src, dst)
+            
+            # Update progress
+            mid_progress = (progress_start + progress_end) // 2
+            self.progress.emit(
+                mid_progress, 
+                f"Training model on batch {batch_idx + 1}/{total_batches}..."
+            )
+            
+            # Train model on this batch
+            self.train_model_batch(batch_frames_dir, batch_dir, batch_idx)
+            
+            # Generate compressed frames for this batch
+            batch_output_dir = os.path.join(batch_dir, "output_frames")
+            self.generate_batch_output(batch_dir, batch_output_dir, len(batch_frame_files))
+            
+            # Copy compressed frames to main output directory with correct numbering
+            self.copy_batch_output(batch_output_dir, output_frames_dir, start_idx)
+            
+            # Clean up batch directory to save space
+            shutil.rmtree(batch_dir)
+            
+            logger.info(f"Completed batch {batch_idx + 1}/{total_batches}")
+            
+        except Exception as e:
+            logger.error(f"Error processing batch {batch_idx}: {str(e)}")
+            raise
+    
+    def train_model_batch(self, batch_frames_dir, batch_dir, batch_idx):
+        """Train HiNeRV model on a batch of frames"""
+        # Get HiNeRV root directory
         gui_dir = Path(__file__).parent
         hinerv_root = gui_dir.parent
         
-        # Convert frames_dir to absolute path
-        frames_dir_abs = os.path.abspath(frames_dir)
-        
-        # Log paths for debugging
-        logger.info(f"GUI directory: {gui_dir}")
-        logger.info(f"HiNeRV root directory: {hinerv_root}")
-        logger.info(f"Frames directory (absolute): {frames_dir_abs}")
-        
-        # Prepare paths - use absolute paths
-        dataset_dir = os.path.dirname(frames_dir_abs)
-        dataset_name = os.path.basename(frames_dir_abs)
-        model_output = os.path.join(self.output_dir, "model")
-        model_output_abs = os.path.abspath(model_output)
-        
-        # Create model output directory
-        os.makedirs(model_output_abs, exist_ok=True)
+        # Prepare paths
+        dataset_dir = os.path.dirname(batch_frames_dir)
+        dataset_name = os.path.basename(batch_frames_dir)
+        model_output = os.path.join(batch_dir, "model")
+        os.makedirs(model_output, exist_ok=True)
         
         # Read config files
         train_cfg_path = hinerv_root / "cfgs" / "train" / "hinerv_1280x720.txt"
@@ -144,7 +217,7 @@ class VideoProcessor(QThread):
         if not hinerv_main_path.exists():
             raise FileNotFoundError(f"hinerv_main.py not found: {hinerv_main_path}")
         
-        # Build command with absolute paths
+        # Build command
         cmd = [
             "accelerate", "launch",
             "--mixed_precision=fp16",
@@ -152,7 +225,7 @@ class VideoProcessor(QThread):
             str(hinerv_main_path),
             "--dataset", dataset_dir,
             "--dataset-name", dataset_name,
-            "--output", model_output_abs
+            "--output", model_output
         ]
         
         # Add config file contents
@@ -166,21 +239,20 @@ class VideoProcessor(QThread):
             if model_config:
                 cmd.extend(model_config.split())
         
-        # Add runtime parameters
+        # Add runtime parameters - reduce for smaller batches
         cmd.extend([
             "--batch-size", "1",
             "--eval-batch-size", "1",
             "--grad-accum", "1",
             "--log-eval", "true",
-            "--seed", "0"
+            "--seed", str(batch_idx),  # Different seed for each batch
+            "--epochs", "50"  # Fewer epochs for faster processing
         ])
         
-        # Log the full command for debugging
-        logger.info(f"Running command: {' '.join(cmd)}")
-        logger.info(f"Working directory: {hinerv_root}")
+        logger.info(f"Training batch {batch_idx} with command: {' '.join(cmd)}")
         
-        # Create log file for training output
-        log_file_path = os.path.join(self.output_dir, "training_log.txt")
+        # Create log file for this batch
+        log_file_path = os.path.join(batch_dir, f"training_log_batch_{batch_idx}.txt")
         
         # Run training
         with open(log_file_path, 'w') as log_file:
@@ -193,39 +265,74 @@ class VideoProcessor(QThread):
                 env=os.environ.copy()
             )
             
-            # Monitor progress and collect output
-            output_lines = []
+            # Monitor progress
             for line in process.stdout:
-                output_lines.append(line)
                 log_file.write(line)
                 log_file.flush()
                 
-                # Log important lines
                 if "Error" in line or "error" in line:
-                    logger.error(f"Training error: {line.strip()}")
+                    logger.error(f"Batch {batch_idx} training error: {line.strip()}")
                 elif "Epoch" in line:
-                    # Update progress based on epoch info
-                    self.progress.emit(50, f"Training... {line.strip()}")
-                    logger.info(f"Training progress: {line.strip()}")
+                    logger.info(f"Batch {batch_idx} progress: {line.strip()}")
             
             process.wait()
             
             if process.returncode != 0:
-                # Get last 20 lines of output for error message
-                error_lines = output_lines[-20:] if len(output_lines) > 20 else output_lines
-                error_msg = "Training failed. Last output:\n" + "".join(error_lines)
-                logger.error(f"Training failed with return code {process.returncode}")
-                logger.error(f"Full log saved to: {log_file_path}")
+                error_msg = f"Training failed for batch {batch_idx}. Check log: {log_file_path}"
+                logger.error(error_msg)
                 raise RuntimeError(error_msg)
     
-    def generate_output(self):
-        """Generate compressed video from model"""
-        # For now, create a placeholder compressed video
+    def generate_batch_output(self, batch_dir, output_dir, num_frames):
+        """Generate compressed frames for a batch"""
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # For now, create placeholder compressed frames
         # In a real implementation, this would use HiNeRV's decompression
+        batch_frames_dir = os.path.join(batch_dir, "frames")
+        frame_files = sorted(glob.glob(os.path.join(batch_frames_dir, "*.png")))
+        
+        for i, frame_file in enumerate(frame_files):
+            output_file = os.path.join(output_dir, f"{i+1:06d}.png")
+            # For now, just copy the original frame
+            # In real implementation, use the trained model to generate compressed frame
+            shutil.copy2(frame_file, output_file)
+        
+        logger.info(f"Generated {len(frame_files)} compressed frames for batch")
+    
+    def copy_batch_output(self, batch_output_dir, main_output_dir, start_frame_idx):
+        """Copy batch output frames to main output directory with correct numbering"""
+        batch_files = sorted(glob.glob(os.path.join(batch_output_dir, "*.png")))
+        
+        for i, batch_file in enumerate(batch_files):
+            # Calculate the correct frame number in the final sequence
+            final_frame_num = start_frame_idx + i + 1
+            final_output_file = os.path.join(main_output_dir, f"{final_frame_num:06d}.png")
+            shutil.copy2(batch_file, final_output_file)
+        
+        logger.info(f"Copied {len(batch_files)} frames to main output starting from frame {start_frame_idx + 1}")
+    
+    def create_final_video(self, compressed_frames_dir):
+        """Create final compressed video from all compressed frames"""
         compressed_path = os.path.join(self.output_dir, "compressed.mp4")
         
-        # Copy original as placeholder (in real implementation, use HiNeRV output)
-        shutil.copy(self.video_path, compressed_path)
+        # Get original video properties
+        cap = cv2.VideoCapture(self.video_path)
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        cap.release()
+        
+        # Create video from compressed frames
+        cmd = [
+            "ffmpeg", "-y",  # Overwrite output
+            "-r", str(fps),  # Frame rate
+            "-i", os.path.join(compressed_frames_dir, "%06d.png"),
+            "-c:v", "libx264",  # Video codec
+            "-pix_fmt", "yuv420p",  # Pixel format for compatibility
+            "-crf", "23",  # Quality setting
+            compressed_path
+        ]
+        
+        subprocess.run(cmd, check=True, capture_output=True)
+        logger.info(f"Created final compressed video: {compressed_path}")
         
         return compressed_path
     
@@ -244,6 +351,10 @@ class VideoProcessor(QThread):
         }
         
         return results
+    
+    def stop(self):
+        """Stop the processing"""
+        self.is_running = False
 
 
 class VideoPreviewWidget(QWidget):
@@ -393,7 +504,7 @@ class MainWindow(QMainWindow):
         
     def setup_ui(self):
         """Set up the user interface"""
-        self.setWindowTitle("HiNeRV Video Compressor")
+        self.setWindowTitle("HiNeRV Video Compressor - Batch Processing")
         self.setMinimumSize(1200, 700)
         
         # Central widget
@@ -413,6 +524,16 @@ class MainWindow(QMainWindow):
             padding: 10px;
         """)
         main_layout.addWidget(header)
+        
+        # Batch info
+        batch_info = QLabel("Processing in batches of 40 frames to prevent memory issues")
+        batch_info.setAlignment(Qt.AlignCenter)
+        batch_info.setStyleSheet("""
+            font-size: 12px;
+            color: #888;
+            padding: 5px;
+        """)
+        main_layout.addWidget(batch_info)
         
         # Upload section
         upload_widget = self.create_upload_section()
@@ -500,7 +621,7 @@ class MainWindow(QMainWindow):
         layout.addLayout(previews_layout)
         
         # Compress button
-        self.compress_btn = QPushButton("Start Compression")
+        self.compress_btn = QPushButton("Start Batch Compression")
         self.compress_btn.setStyleSheet("""
             QPushButton {
                 background-color: #2196F3;
@@ -517,6 +638,26 @@ class MainWindow(QMainWindow):
         """)
         self.compress_btn.clicked.connect(self.start_compression)
         layout.addWidget(self.compress_btn, alignment=Qt.AlignCenter)
+        
+        # Stop button (initially hidden)
+        self.stop_btn = QPushButton("Stop Processing")
+        self.stop_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+                color: white;
+                border: none;
+                padding: 15px 30px;
+                border-radius: 5px;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #d32f2f;
+            }
+        """)
+        self.stop_btn.clicked.connect(self.stop_compression)
+        self.stop_btn.setVisible(False)
+        layout.addWidget(self.stop_btn, alignment=Qt.AlignCenter)
         
         return widget
     
@@ -704,16 +845,30 @@ class MainWindow(QMainWindow):
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
         # Update UI
-        self.compress_btn.setEnabled(False)
+        self.compress_btn.setVisible(False)
+        self.stop_btn.setVisible(True)
         self.progress_widget.setVisible(True)
         self.results_widget.setVisible(False)
         
-        # Start compression thread with absolute paths
-        self.processor = VideoProcessor(str(self.video_path), str(self.output_dir))
+        # Start compression thread with batch processing
+        self.processor = VideoProcessor(str(self.video_path), str(self.output_dir), batch_size=40)
         self.processor.progress.connect(self.update_progress)
         self.processor.finished.connect(self.on_compression_finished)
         self.processor.error.connect(self.on_compression_error)
         self.processor.start()
+    
+    def stop_compression(self):
+        """Stop the compression process"""
+        if self.processor and self.processor.isRunning():
+            self.processor.stop()
+            self.processor.wait(5000)  # Wait up to 5 seconds
+            
+        # Reset UI
+        self.compress_btn.setVisible(True)
+        self.stop_btn.setVisible(False)
+        self.progress_widget.setVisible(False)
+        
+        QMessageBox.information(self, "Stopped", "Compression process has been stopped.")
     
     def update_progress(self, value, message):
         """Update progress bar and status"""
@@ -723,7 +878,8 @@ class MainWindow(QMainWindow):
     def on_compression_finished(self, results):
         """Handle compression completion"""
         # Update UI
-        self.compress_btn.setEnabled(True)
+        self.compress_btn.setVisible(True)
+        self.stop_btn.setVisible(False)
         self.progress_widget.setVisible(False)
         self.results_widget.setVisible(True)
         
@@ -746,23 +902,34 @@ class MainWindow(QMainWindow):
         self.result_labels['space_saved'].setText(
             f"Space Saved: {results['space_saved']*100:.1f}%"
         )
+        
+        # Show completion message
+        QMessageBox.information(
+            self, 
+            "Compression Complete", 
+            f"Video compression completed successfully!\n\nProcessed in batches of 40 frames to prevent memory issues."
+        )
     
     def on_compression_error(self, error_msg):
         """Handle compression error"""
-        self.compress_btn.setEnabled(True)
+        self.compress_btn.setVisible(True)
+        self.stop_btn.setVisible(False)
         self.progress_widget.setVisible(False)
         
         # Check if there's a log file we can point to
         log_file_hint = ""
         if self.output_dir:
-            log_file = os.path.join(self.output_dir, "training_log.txt")
-            if os.path.exists(log_file):
-                log_file_hint = f"\n\nDetailed log saved to:\n{log_file}"
+            # Look for any batch log files
+            log_files = glob.glob(os.path.join(self.output_dir, "**/training_log_batch_*.txt"), recursive=True)
+            if log_files:
+                log_file_hint = f"\n\nDetailed logs saved to:\n" + "\n".join(log_files[:3])
+                if len(log_files) > 3:
+                    log_file_hint += f"\n... and {len(log_files) - 3} more"
         
         # Create detailed error dialog
         error_dialog = QMessageBox(self)
         error_dialog.setWindowTitle("Compression Error")
-        error_dialog.setText("An error occurred during compression:")
+        error_dialog.setText("An error occurred during batch compression:")
         error_dialog.setDetailedText(error_msg + log_file_hint)
         error_dialog.setIcon(QMessageBox.Critical)
         error_dialog.exec()
@@ -770,14 +937,24 @@ class MainWindow(QMainWindow):
     def play_original(self):
         """Play original video"""
         if self.video_path and os.path.exists(self.video_path):
-            os.system(f'xdg-open "{self.video_path}"')
+            if sys.platform.startswith('darwin'):  # macOS
+                os.system(f'open "{self.video_path}"')
+            elif sys.platform.startswith('win'):  # Windows
+                os.system(f'start "" "{self.video_path}"')
+            else:  # Linux
+                os.system(f'xdg-open "{self.video_path}"')
     
     def play_compressed(self):
         """Play compressed video"""
         if hasattr(self, 'compression_results'):
             compressed_path = self.compression_results.get('compressed_path')
             if compressed_path and os.path.exists(compressed_path):
-                os.system(f'xdg-open "{compressed_path}"')
+                if sys.platform.startswith('darwin'):  # macOS
+                    os.system(f'open "{compressed_path}"')
+                elif sys.platform.startswith('win'):  # Windows
+                    os.system(f'start "" "{compressed_path}"')
+                else:  # Linux
+                    os.system(f'xdg-open "{compressed_path}"')
     
     def save_compressed(self):
         """Save compressed video to user location"""
@@ -804,6 +981,11 @@ class MainWindow(QMainWindow):
         self.video_path = None
         self.output_dir = None
         
+        # Stop any running processor
+        if self.processor and self.processor.isRunning():
+            self.processor.stop()
+            self.processor.wait(5000)
+        
         # Reset upload area
         self.upload_area.setText("Drag and drop a video file here\nor click to browse")
         self.upload_area.setStyleSheet("""
@@ -819,6 +1001,10 @@ class MainWindow(QMainWindow):
                 color: #ccc;
             }
         """)
+        
+        # Reset button states
+        self.compress_btn.setVisible(True)
+        self.stop_btn.setVisible(False)
         
         # Hide sections
         self.comparison_widget.setVisible(False)
@@ -846,12 +1032,32 @@ class MainWindow(QMainWindow):
             video_extensions = ['.mp4', '.avi', '.mkv', '.mov', '.webm']
             if any(files[0].lower().endswith(ext) for ext in video_extensions):
                 self.load_video(files[0])
+    
+    def closeEvent(self, event):
+        """Handle application close"""
+        if self.processor and self.processor.isRunning():
+            reply = QMessageBox.question(
+                self, 
+                'Exit Application', 
+                'Compression is in progress. Are you sure you want to exit?',
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            
+            if reply == QMessageBox.Yes:
+                self.processor.stop()
+                self.processor.wait(5000)
+                event.accept()
+            else:
+                event.ignore()
+        else:
+            event.accept()
 
 
 def main():
     """Main entry point"""
     app = QApplication(sys.argv)
-    app.setApplicationName("HiNeRV Video Compressor")
+    app.setApplicationName("HiNeRV Video Compressor - Batch Processing")
     
     # Set application style
     app.setStyle("Fusion")

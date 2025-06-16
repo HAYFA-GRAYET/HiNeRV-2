@@ -46,7 +46,6 @@ class VideoInfo:
         self.size_bytes = 0
         self.size_str = ""
 
-
 class VideoProcessor(QThread):
     """Background thread for video compression with batch processing"""
     
@@ -54,12 +53,11 @@ class VideoProcessor(QThread):
     finished = Signal(dict)  # compression results
     error = Signal(str)  # error message
     
-    def __init__(self, video_path, output_dir, batch_size=40, epochs=20):
+    def __init__(self, video_path, output_dir, batch_size=40):
         super().__init__()
         self.video_path = video_path
         self.output_dir = os.path.abspath(output_dir)
         self.batch_size = batch_size
-        self.epochs = epochs
         self.is_running = True
         
     def run(self):
@@ -75,7 +73,7 @@ class VideoProcessor(QThread):
             total_batches = math.ceil(total_frames / self.batch_size)
             
             self.progress.emit(10, f"Processing {total_frames} frames in {total_batches} batches of {self.batch_size} frames each...")
-            logger.info(f"Total frames: {total_frames}, Batches: {total_batches}, Batch size: {self.batch_size}, Epochs: {self.epochs}")
+            logger.info(f"Total frames: {total_frames}, Batches: {total_batches}, Batch size: {self.batch_size}")
             
             # Step 3: Process frames in batches
             output_frames_dir = os.path.join(self.output_dir, "compressed_frames")
@@ -180,7 +178,7 @@ class VideoProcessor(QThread):
             train_progress = progress_start + int((progress_end - progress_start) * 0.7)
             self.progress.emit(
                 train_progress, 
-                f"Training HiNeRV model on batch {batch_idx + 1}/{total_batches} ({actual_batch_size} frames, {self.epochs} epochs)..."
+                f"Training HiNeRV model on batch {batch_idx + 1}/{total_batches} ({actual_batch_size} frames)..."
             )
             
             # Train model on this batch
@@ -271,17 +269,16 @@ class VideoProcessor(QThread):
         if model_cfg_content:
             cmd.extend(model_cfg_content.split())
         
-        # Add runtime arguments
+        # Add runtime arguments (remove epochs - use config file setting)
         cmd.extend([
             "--batch-size", "1",
             "--eval-batch-size", "1",
             "--grad-accum", "1",
             "--log-eval", "true",
-            "--seed", str(batch_idx),
-            "--epochs", str(self.epochs)
+            "--seed", str(batch_idx)
         ])
         
-        logger.info(f"Training batch {batch_idx} with {self.epochs} epochs")
+        logger.info(f"Training batch {batch_idx} with config file epochs setting")
         
         # Create log file
         log_file_path = os.path.join(batch_dir, f"training_log_batch_{batch_idx}.txt")
@@ -623,7 +620,6 @@ class VideoProcessor(QThread):
                 # Batch processing metrics
                 'total_batches': total_batches,
                 'batch_size': self.batch_size,
-                'epochs_per_batch': self.epochs,
                 'total_frames_processed': total_frames_processed,
                 'fallback_batches': fallback_count,
                 
@@ -659,8 +655,6 @@ class VideoProcessor(QThread):
     def stop(self):
         """Stop the processing"""
         self.is_running = False
-
-
 class VideoPreviewWidget(QWidget):
     """Widget for video preview and information display"""
     
@@ -909,7 +903,7 @@ class MainWindow(QMainWindow):
         return widget
     
     def create_comparison_section(self):
-        """Create video comparison section with epoch control"""
+        """Create video comparison section"""
         widget = QWidget()
         layout = QVBoxLayout(widget)
         
@@ -924,42 +918,15 @@ class MainWindow(QMainWindow):
         
         layout.addLayout(previews_layout)
         
-        # Training settings
-        settings_widget = QGroupBox("HiNeRV Training Settings")
-        settings_layout = QHBoxLayout(settings_widget)
+        # Training info
+        info_widget = QGroupBox("HiNeRV Processing Info")
+        info_layout = QVBoxLayout(info_widget)
         
-        # Epochs control
-        settings_layout.addWidget(QLabel("Epochs per batch:"))
+        info_text = QLabel("• Processing 40 frames per batch\n• Using epochs from configuration files\n• Each batch trains independently with HiNeRV")
+        info_text.setStyleSheet("color: #888; font-size: 12px; padding: 10px;")
+        info_layout.addWidget(info_text)
         
-        self.epoch_spinbox = QSpinBox()
-        self.epoch_spinbox.setMinimum(5)
-        self.epoch_spinbox.setMaximum(200)
-        self.epoch_spinbox.setValue(20)
-        self.epoch_spinbox.setStyleSheet("""
-            QSpinBox {
-                background-color: #333;
-                color: white;
-                border: 1px solid #555;
-                padding: 5px;
-                border-radius: 3px;
-                min-width: 60px;
-            }
-        """)
-        settings_layout.addWidget(self.epoch_spinbox)
-        
-        # Batch size info
-        batch_info = QLabel("Batch size: 40 frames")
-        batch_info.setStyleSheet("color: #888; font-size: 12px; padding: 5px;")
-        settings_layout.addWidget(batch_info)
-        
-        # Quality info
-        quality_info = QLabel("• 10-20 epochs: Fast, moderate quality\n• 30-50 epochs: Balanced\n• 100+ epochs: Best quality, slower")
-        quality_info.setStyleSheet("color: #888; font-size: 11px; padding: 5px;")
-        settings_layout.addWidget(quality_info)
-        
-        settings_layout.addStretch()
-        
-        layout.addWidget(settings_widget)
+        layout.addWidget(info_widget)
         
         # Compress button
         self.compress_btn = QPushButton("Start HiNeRV Batch Compression")
@@ -1001,7 +968,6 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.stop_btn, alignment=Qt.AlignCenter)
         
         return widget
-    
     def create_progress_section(self):
         """Create progress section"""
         widget = QGroupBox("Compression Progress")
@@ -1181,7 +1147,6 @@ class MainWindow(QMainWindow):
         layout.addWidget(new_btn, alignment=Qt.AlignCenter)
         
         return widget
-    
     def apply_theme(self):
         """Apply dark theme to the application"""
         self.setStyleSheet("""
@@ -1240,12 +1205,9 @@ class MainWindow(QMainWindow):
         self.original_preview.load_video(file_path)
     
     def start_compression(self):
-        """Start the compression process with epoch setting"""
+        """Start the compression process using config file epochs"""
         if not self.video_path:
             return
-        
-        # Get epochs setting from GUI
-        epochs = self.epoch_spinbox.value()
         
         # Create output directory
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1262,12 +1224,13 @@ class MainWindow(QMainWindow):
         self.results_widget.setVisible(False)
         
         # Start compression thread
-        self.processor = VideoProcessor(str(self.video_path), str(self.output_dir), batch_size=40, epochs=epochs)
+        self.processor = VideoProcessor(str(self.video_path), str(self.output_dir), batch_size=40)
         self.processor.progress.connect(self.update_progress)
         self.processor.finished.connect(self.on_compression_finished)
         self.processor.error.connect(self.on_compression_error)
         self.processor.start()
-    
+
+
     def stop_compression(self):
         """Stop the compression process"""
         if self.processor and self.processor.isRunning():
@@ -1324,9 +1287,8 @@ class MainWindow(QMainWindow):
         
         # Batch info
         total_batches = results.get('total_batches', 0)
-        epochs_per_batch = results.get('epochs_per_batch', 0)
         self.result_labels['total_batches'].setText(
-            f"Batches Processed: {total_batches} ({epochs_per_batch} epochs each)"
+            f"Batches Processed: {total_batches} (config file epochs)"
         )
         
         # Performance indicators
@@ -1360,7 +1322,7 @@ class MainWindow(QMainWindow):
             f"• Overall compression ratio: {results.get('video_compression_ratio', 1):.2f}x\n"
             f"• Space saved: {results.get('video_space_saved', 0)*100:.1f}%"
         )
-    
+
     def on_compression_error(self, error_msg):
         """Handle compression error"""
         self.compress_btn.setVisible(True)
@@ -1588,7 +1550,7 @@ class MainWindow(QMainWindow):
                         f.write("Processing Details:\n")
                         f.write(f"  Total Batches: {results.get('total_batches', 0)}\n")
                         f.write(f"  Batch Size: {results.get('batch_size', 0)} frames\n")
-                        f.write(f"  Epochs per Batch: {results.get('epochs_per_batch', 0)}\n")
+                        f.write(f"  Epochs: From configuration files\n")
                         f.write(f"  Total Frames: {results.get('total_frames_processed', 0)}\n")
                         f.write(f"  Neural Compression Success: {results.get('total_batches', 0) - results.get('fallback_batches', 0)}/{results.get('total_batches', 0)} batches\n\n")
                         

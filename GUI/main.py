@@ -21,6 +21,10 @@ from PySide6.QtWidgets import (
     QGroupBox, QGridLayout, QMessageBox, QSplitter, QSpinBox,
     QTabWidget
 )
+from PySide6.QtCore import QTimer, QUrl
+from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
+from PySide6.QtMultimediaWidgets import QVideoWidget
+from PySide6.QtWidgets import QSlider, QStyle
 from PySide6.QtCore import Qt, QThread, Signal, QTimer, QSize
 from PySide6.QtGui import QPixmap, QFont, QPalette, QColor, QDragEnterEvent, QDropEvent
 
@@ -652,18 +656,23 @@ class VideoProcessor(QThread):
     def stop(self):
         self.is_running = False
 
-
-class VideoPreviewWidget(QWidget):
+class EmbeddedVideoWidget(QWidget):
+    """
+    Enhanced video widget with embedded playback capabilities
+    Replaces static thumbnails with actual video player controls
+    """
     def __init__(self, title="Video"):
         super().__init__()
         self.title = title
         self.video_info = VideoInfo()
         self.setup_ui()
+        self.setup_media_player()
         
     def setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setSpacing(6)
         
+        # Title label
         title_label = QLabel(self.title)
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setStyleSheet("""
@@ -676,20 +685,86 @@ class VideoPreviewWidget(QWidget):
         """)
         layout.addWidget(title_label)
         
-        self.preview_label = QLabel()
-        self.preview_label.setMinimumSize(400, 280)
-        self.preview_label.setMaximumSize(600, 420)
-        self.preview_label.setScaledContents(True)
-        self.preview_label.setStyleSheet("""
-            QLabel {
+        # Video display widget
+        self.video_widget = QVideoWidget()
+        self.video_widget.setMinimumSize(400, 280)
+        self.video_widget.setMaximumSize(600, 420)
+        self.video_widget.setStyleSheet("""
+            QVideoWidget {
                 background-color: #2b2b2b;
                 border: 2px solid #444;
                 border-radius: 6px;
             }
         """)
-        self.preview_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(self.preview_label)
+        layout.addWidget(self.video_widget)
         
+        # Media controls
+        controls_frame = QFrame()
+        controls_frame.setStyleSheet("""
+            QFrame {
+                background-color: #333;
+                border-radius: 4px;
+                padding: 8px;
+                margin-top: 4px;
+            }
+        """)
+        controls_layout = QHBoxLayout(controls_frame)
+        controls_layout.setSpacing(8)
+        
+        # Play/Pause button
+        self.play_button = QPushButton()
+        self.play_button.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
+        self.play_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                border: none;
+                border-radius: 4px;
+                padding: 8px;
+                min-width: 40px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        self.play_button.clicked.connect(self.toggle_playback)
+        controls_layout.addWidget(self.play_button)
+        
+        # Progress slider
+        self.position_slider = QSlider(Qt.Horizontal)
+        self.position_slider.setStyleSheet("""
+            QSlider::groove:horizontal {
+                border: 1px solid #555;
+                height: 8px;
+                background: #2b2b2b;
+                border-radius: 4px;
+            }
+            QSlider::handle:horizontal {
+                background: #4CAF50;
+                border: 1px solid #4CAF50;
+                width: 18px;
+                border-radius: 9px;
+            }
+            QSlider::sub-page:horizontal {
+                background: #4CAF50;
+                border-radius: 4px;
+            }
+        """)
+        self.position_slider.sliderMoved.connect(self.set_position)
+        controls_layout.addWidget(self.position_slider)
+        
+        # Time label
+        self.time_label = QLabel("00:00 / 00:00")
+        self.time_label.setStyleSheet("""
+            color: #ddd;
+            font-size: 11px;
+            font-weight: 500;
+            min-width: 80px;
+        """)
+        controls_layout.addWidget(self.time_label)
+        
+        layout.addWidget(controls_frame)
+        
+        # Video info section
         info_frame = QFrame()
         info_frame.setStyleSheet("""
             QFrame {
@@ -700,27 +775,6 @@ class VideoPreviewWidget(QWidget):
             }
         """)
         info_layout = QGridLayout(info_frame)
-        info_layout.setSpacing(4)
-        
-        self.info_labels = {
-            'resolution': QLabel("Resolution: --"),
-            'fps': QLabel("FPS: --"),
-            'size': QLabel("Size: --"),
-            'duration': QLabel("Duration: --")
-        }
-        
-        row = 0
-        for key, label in self.info_labels.items():
-            label.setStyleSheet("""
-                color: #ddd; 
-                padding: 3px; 
-                font-size: 10px;
-                font-weight: 500;
-            """)
-            info_layout.addWidget(label, row // 2, row % 2)
-            row += 1
-        
-        layout.addWidget(info_frame)
         info_layout.setSpacing(8)
         
         self.info_labels = {
@@ -735,7 +789,7 @@ class VideoPreviewWidget(QWidget):
             label.setStyleSheet("""
                 color: #ddd; 
                 padding: 4px; 
-                font-size: 13px;
+                font-size: 11px;
                 font-weight: 500;
             """)
             info_layout.addWidget(label, row // 2, row % 2)
@@ -743,12 +797,28 @@ class VideoPreviewWidget(QWidget):
         
         layout.addWidget(info_frame)
     
+    def setup_media_player(self):
+        """Initialize the media player components"""
+        self.media_player = QMediaPlayer()
+        self.audio_output = QAudioOutput()
+        
+        # Connect media player to video widget and audio output
+        self.media_player.setVideoOutput(self.video_widget)
+        self.media_player.setAudioOutput(self.audio_output)
+        
+        # Connect signals for player state management
+        self.media_player.positionChanged.connect(self.position_changed)
+        self.media_player.durationChanged.connect(self.duration_changed)
+        self.media_player.playbackStateChanged.connect(self.state_changed)
+    
     def load_video(self, video_path):
+        """Load a video file into the player"""
         if not os.path.exists(video_path):
             return
         
         self.video_info.path = video_path
         
+        # Load video info using OpenCV for metadata
         cap = cv2.VideoCapture(video_path)
         if cap.isOpened():
             self.video_info.width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -756,39 +826,67 @@ class VideoPreviewWidget(QWidget):
             self.video_info.fps = cap.get(cv2.CAP_PROP_FPS)
             self.video_info.frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             self.video_info.duration = self.video_info.frame_count / self.video_info.fps if self.video_info.fps > 0 else 0
-            
-            cap.set(cv2.CAP_PROP_POS_FRAMES, self.video_info.frame_count // 2)
-            ret, frame = cap.read()
-            if ret:
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                h, w, ch = frame_rgb.shape
-                bytes_per_line = ch * w
-                
-                from PySide6.QtGui import QImage
-                q_image = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
-                pixmap = QPixmap.fromImage(q_image)
-                
-                scaled_pixmap = pixmap.scaled(
-                    self.preview_label.size(),
-                    Qt.KeepAspectRatio,
-                    Qt.SmoothTransformation
-                )
-                self.preview_label.setPixmap(scaled_pixmap)
-            
             cap.release()
         
         self.video_info.size_bytes = os.path.getsize(video_path)
         self.video_info.size_str = self.format_size(self.video_info.size_bytes)
         
+        # Load video into media player
+        media_url = QUrl.fromLocalFile(os.path.abspath(video_path))
+        self.media_player.setSource(media_url)
+        
         self.update_info()
     
+    def toggle_playback(self):
+        """Toggle between play and pause states"""
+        if self.media_player.playbackState() == QMediaPlayer.PlayingState:
+            self.media_player.pause()
+        else:
+            self.media_player.play()
+    
+    def position_changed(self, position):
+        """Update position slider when video position changes"""
+        self.position_slider.setValue(position)
+        self.update_time_label(position)
+    
+    def duration_changed(self, duration):
+        """Set slider range when video duration is known"""
+        self.position_slider.setRange(0, duration)
+    
+    def set_position(self, position):
+        """Seek to specific position when slider is moved"""
+        self.media_player.setPosition(position)
+    
+    def state_changed(self, state):
+        """Update play button icon based on playback state"""
+        if state == QMediaPlayer.PlayingState:
+            self.play_button.setIcon(self.style().standardIcon(QStyle.SP_MediaPause))
+        else:
+            self.play_button.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
+    
+    def update_time_label(self, position):
+        """Update the time display label"""
+        duration = self.media_player.duration()
+        
+        def format_time(ms):
+            seconds = ms // 1000
+            minutes = seconds // 60
+            seconds = seconds % 60
+            return f"{minutes:02d}:{seconds:02d}"
+        
+        current_time = format_time(position)
+        total_time = format_time(duration)
+        self.time_label.setText(f"{current_time} / {total_time}")
+    
     def update_info(self):
+        """Update the video information display"""
         self.info_labels['resolution'].setText(f"Resolution: {self.video_info.width}x{self.video_info.height}")
         self.info_labels['fps'].setText(f"FPS: {self.video_info.fps:.2f}")
         self.info_labels['size'].setText(f"Size: {self.video_info.size_str}")
         self.info_labels['duration'].setText(f"Duration: {self.format_duration(self.video_info.duration)}")
     
     def format_size(self, size_bytes):
+        """Format file size in human readable format"""
         for unit in ['B', 'KB', 'MB', 'GB']:
             if size_bytes < 1024.0:
                 return f"{size_bytes:.2f} {unit}"
@@ -796,6 +894,7 @@ class VideoPreviewWidget(QWidget):
         return f"{size_bytes:.2f} TB"
     
     def format_duration(self, seconds):
+        """Format duration in human readable format"""
         if seconds < 60:
             return f"{int(seconds)}s"
         minutes = int(seconds // 60)
@@ -805,7 +904,6 @@ class VideoPreviewWidget(QWidget):
         hours = minutes // 60
         mins = minutes % 60
         return f"{hours}h {mins}m {secs}s"
-
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -951,19 +1049,19 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(widget)
         layout.setSpacing(8)
         
-        # Video previews
+        # Video previews - CHANGED: Use EmbeddedVideoWidget instead of VideoPreviewWidget
         previews_layout = QHBoxLayout()
         previews_layout.setSpacing(10)
         
-        self.original_preview = VideoPreviewWidget("Original Video")
-        self.compressed_preview = VideoPreviewWidget("Compressed Video")
+        self.original_preview = EmbeddedVideoWidget("Original Video")
+        self.compressed_preview = EmbeddedVideoWidget("Compressed Video")
         
         previews_layout.addWidget(self.original_preview)
         previews_layout.addWidget(self.compressed_preview)
         
         layout.addLayout(previews_layout)
         
-        # Control buttons
+        # Control buttons - REMOVED: Individual play buttons since widgets now have their own
         controls_frame = QFrame()
         controls_frame.setStyleSheet("""
             QFrame {
@@ -979,7 +1077,7 @@ class MainWindow(QMainWindow):
         self.compress_btn.setStyleSheet("""
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                           stop:0 #2196F3, stop:1 #1976D2);
+                        stop:0 #2196F3, stop:1 #1976D2);
                 color: white;
                 border: none;
                 padding: 10px 20px;
@@ -989,7 +1087,7 @@ class MainWindow(QMainWindow):
             }
             QPushButton:hover {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                           stop:0 #1976D2, stop:1 #1565C0);
+                        stop:0 #1976D2, stop:1 #1565C0);
             }
         """)
         self.compress_btn.clicked.connect(self.start_compression)
@@ -999,7 +1097,7 @@ class MainWindow(QMainWindow):
         self.stop_btn.setStyleSheet("""
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                           stop:0 #f44336, stop:1 #d32f2f);
+                        stop:0 #f44336, stop:1 #d32f2f);
                 color: white;
                 border: none;
                 padding: 10px 20px;
@@ -1009,7 +1107,7 @@ class MainWindow(QMainWindow):
             }
             QPushButton:hover {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                           stop:0 #d32f2f, stop:1 #c62828);
+                        stop:0 #d32f2f, stop:1 #c62828);
             }
         """)
         self.stop_btn.clicked.connect(self.stop_compression)
@@ -1018,32 +1116,26 @@ class MainWindow(QMainWindow):
         
         controls_layout.addStretch()
         
-        # Video control buttons
-        self.play_original_btn = QPushButton("▶ Play Original")
-        self.play_compressed_btn = QPushButton("▶ Play Compressed")
-        
-        video_controls = [self.play_original_btn, self.play_compressed_btn]
-        for btn in video_controls:
-            btn.setStyleSheet("""
-                QPushButton {
-                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                               stop:0 #555, stop:1 #444);
-                    color: white;
-                    border: 1px solid #666;
-                    padding: 8px 15px;
-                    border-radius: 4px;
-                    font-size: 11px;
-                    font-weight: bold;
-                }
-                QPushButton:hover {
-                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                               stop:0 #666, stop:1 #555);
-                }
-            """)
-            controls_layout.addWidget(btn)
-        
-        self.play_original_btn.clicked.connect(self.play_original)
-        self.play_compressed_btn.clicked.connect(self.play_compressed)
+        # Add sync playback button (optional feature)
+        self.sync_playback_btn = QPushButton("🔗 Sync Playback")
+        self.sync_playback_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #FF9800, stop:1 #F57C00);
+                color: white;
+                border: none;
+                padding: 8px 15px;
+                border-radius: 4px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 #F57C00, stop:1 #EF6C00);
+            }
+        """)
+        self.sync_playback_btn.clicked.connect(self.sync_video_playback)
+        controls_layout.addWidget(self.sync_playback_btn)
         
         layout.addWidget(controls_frame)
         
@@ -1490,15 +1582,23 @@ class MainWindow(QMainWindow):
         error_dialog.setIcon(QMessageBox.Critical)
         error_dialog.exec()
     
-    def play_original(self):
-        if self.video_path and os.path.exists(self.video_path):
-            self.open_video_file(self.video_path)
-    
-    def play_compressed(self):
-        if hasattr(self, 'compression_results'):
-            compressed_path = self.compression_results.get('compressed_path')
-            if compressed_path and os.path.exists(compressed_path):
-                self.open_video_file(compressed_path)
+    def sync_video_playback(self):
+        """Synchronize playback of both videos for comparison"""
+        if hasattr(self, 'original_preview') and hasattr(self, 'compressed_preview'):
+            # Pause both videos first
+            self.original_preview.media_player.pause()
+            self.compressed_preview.media_player.pause()
+            
+            # Reset both to beginning
+            self.original_preview.media_player.setPosition(0)
+            self.compressed_preview.media_player.setPosition(0)
+            
+            # Start both simultaneously
+            self.original_preview.media_player.play()
+            self.compressed_preview.media_player.play()
+            
+            QMessageBox.information(self, "Sync Playback", 
+                                "Both videos are now playing in sync for comparison!")
     
     def open_video_file(self, file_path):
         """

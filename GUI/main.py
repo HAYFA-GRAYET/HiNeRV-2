@@ -16,8 +16,7 @@ from datetime import datetime
 import time
 import glob
 import math
-from PySide6.QtCore import QShortcut
-from PySide6.QtGui import QKeySequence
+from PySide6.QtGui import QShortcut, QKeySequence
 from PySide6.QtWidgets import QTextEdit, QScrollArea
 # Qt imports
 from PySide6.QtWidgets import (

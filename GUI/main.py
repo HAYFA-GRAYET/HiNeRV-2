@@ -54,10 +54,15 @@ class MetricsChart(FigureCanvas):
         self.setStyleSheet("background-color: #1e1e1e;")
         
     def plot_compression_metrics(self, results):
+        """
+        Updated chart plotting to show only MSSIM and PSNR metrics
+        Removed the bottom two charts as requested and replaced compression ratio with MSSIM
+        """
         self.fig.clear()
         
         batch_metrics = results.get('batch_metrics', [])
         if not batch_metrics:
+            # Display message when no batch metrics are available
             ax = self.fig.add_subplot(111)
             ax.text(0.5, 0.5, 'No batch metrics available', 
                    transform=ax.transAxes, ha='center', va='center',
@@ -66,32 +71,43 @@ class MetricsChart(FigureCanvas):
             self.draw()
             return
         
-        gs = self.fig.add_gridspec(2, 2, hspace=0.3, wspace=0.3)
+        # Create a 1x2 grid layout instead of 2x2 to remove bottom charts
+        gs = self.fig.add_gridspec(1, 2, hspace=0.3, wspace=0.3)
         
         batch_indices = []
-        compression_ratios = []
+        mssim_values = []
         psnr_values = []
-        space_saved_percentages = []
+        
+        # Extract MSSIM values from the metrics
+        mssim_data = results.get('mssim', {})
         
         for batch in batch_metrics:
             if batch and 'compression_metrics' in batch:
-                batch_indices.append(batch.get('batch_idx', 0) + 1)
+                batch_idx = batch.get('batch_idx', 0)
+                batch_indices.append(batch_idx + 1)
                 
-                compression = batch['compression_metrics']
-                compression_ratios.append(compression.get('compression_ratio', 1.0))
-                space_saved_percentages.append(compression.get('space_saved', 0) * 100)
+                # Get MSSIM value for this batch
+                batch_key = f"batch_{batch_idx + 1}"
+                mssim_val = mssim_data.get(batch_key, 0.0)
+                mssim_values.append(mssim_val)
                 
+                # Get PSNR value from training metrics
                 training = batch.get('training_metrics', {})
                 psnr_values.append(training.get('final_psnr', 0))
         
+        # Left chart: MSSIM values by batch (replacing compression ratio)
         ax1 = self.fig.add_subplot(gs[0, 0])
-        if compression_ratios:
-            ax1.bar(batch_indices, compression_ratios, color='#4CAF50', alpha=0.8)
-            ax1.set_title('Compression Ratio by Batch', color='white', fontsize=10)
-            ax1.set_ylabel('Compression Ratio', color='white', fontsize=9)
+        if mssim_values:
+            ax1.bar(batch_indices, mssim_values, color='#4CAF50', alpha=0.8)
+            ax1.set_title('MSSIM by Batch', color='white', fontsize=10)
+            ax1.set_ylabel('MSSIM Score', color='white', fontsize=9)
+            ax1.set_xlabel('Batch Number', color='white', fontsize=9)
+            # Set y-axis range to better show MSSIM values (typically 0.9-1.0)
+            ax1.set_ylim(0.9, 1.0)
             ax1.tick_params(colors='white', labelsize=8)
         ax1.set_facecolor('#2b2b2b')
         
+        # Right chart: PSNR by batch (keeping this one)
         ax2 = self.fig.add_subplot(gs[0, 1])
         if psnr_values and any(p > 0 for p in psnr_values):
             valid_psnr = [p for p in psnr_values if p > 0]
@@ -99,32 +115,9 @@ class MetricsChart(FigureCanvas):
             ax2.plot(valid_indices, valid_psnr, 'o-', color='#2196F3', linewidth=2, markersize=4)
             ax2.set_title('PSNR by Batch', color='white', fontsize=10)
             ax2.set_ylabel('PSNR (dB)', color='white', fontsize=9)
+            ax2.set_xlabel('Batch Number', color='white', fontsize=9)
             ax2.tick_params(colors='white', labelsize=8)
         ax2.set_facecolor('#2b2b2b')
-        
-        ax3 = self.fig.add_subplot(gs[1, 0])
-        if space_saved_percentages:
-            ax3.bar(batch_indices, space_saved_percentages, color='#FF9800', alpha=0.8)
-            ax3.set_title('Space Saved by Batch', color='white', fontsize=10)
-            ax3.set_ylabel('Space Saved (%)', color='white', fontsize=9)
-            ax3.set_xlabel('Batch Number', color='white', fontsize=9)
-            ax3.tick_params(colors='white', labelsize=8)
-        ax3.set_facecolor('#2b2b2b')
-        
-        ax4 = self.fig.add_subplot(gs[1, 1])
-        overall_ratio = results.get('video_compression_ratio', 1.0)
-        overall_saved = results.get('video_space_saved', 0) * 100
-        
-        categories = ['Original Size', 'Compressed Size']
-        sizes = [results.get('original_size', 0), results.get('compressed_size', 0)]
-        colors = ['#f44336', '#4CAF50']
-        
-        if sum(sizes) > 0:
-            ax4.pie([sizes[0] - sizes[1], sizes[1]], labels=['Saved', 'Compressed'], 
-                   colors=['#4CAF50', '#2196F3'], autopct='%1.1f%%', startangle=90,
-                   textprops={'color': 'white', 'fontsize': 8})
-            ax4.set_title('Overall Size Reduction', color='white', fontsize=10)
-        ax4.set_facecolor('#2b2b2b')
         
         self.draw()
 
@@ -277,6 +270,7 @@ class VideoProcessor(QThread):
             raise RuntimeError(f"Batch {batch_idx + 1} failed: {str(e)}")
     
     def train_model_batch(self, batch_frames_dir, batch_dir, batch_idx):
+        # Training logic remains the same
         gui_dir = Path(__file__).parent
         hinerv_root = gui_dir.parent
         
@@ -1065,7 +1059,7 @@ class MainWindow(QMainWindow):
         left_layout = QVBoxLayout(left_panel)
         left_layout.setSpacing(8)
         
-        # Key metrics
+        # Key metrics (updated to include MSSIM total)
         metrics_frame = QFrame()
         metrics_frame.setStyleSheet("""
             QFrame {
@@ -1083,7 +1077,8 @@ class MainWindow(QMainWindow):
             'video_compression_ratio': QLabel("Ratio: --"),
             'video_space_saved': QLabel("Saved: --"),
             'avg_psnr': QLabel("PSNR: --"),
-            'total_batches': QLabel("Batches: --")
+            'total_batches': QLabel("Batches: --"),
+            'total_mssim': QLabel("MSSIM: --")  # Added MSSIM total display
         }
         
         row = 0
@@ -1097,7 +1092,8 @@ class MainWindow(QMainWindow):
                 border-left: 3px solid #4CAF50;
                 font-weight: 500;
             """)
-            metrics_layout.addWidget(label, row // 2, row % 2)
+            # Arrange in a 3x3 grid instead of 3x2
+            metrics_layout.addWidget(label, row // 3, row % 3)
             row += 1
         
         left_layout.addWidget(metrics_frame)
@@ -1269,96 +1265,6 @@ class MainWindow(QMainWindow):
                 f"Failed to load pre-compressed video or metrics:\n{str(e)}"
             )
     
-    def create_comparison_section(self):
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        
-        title_label = QLabel("Video Comparison")
-        title_label.setAlignment(Qt.AlignCenter)
-        title_label.setStyleSheet("""
-            font-size: 20px;
-            font-weight: bold;
-            color: #4CAF50;
-            padding: 10px;
-            background-color: #333;
-            border-radius: 6px;
-            margin-bottom: 10px;
-        """)
-        layout.addWidget(title_label)
-        
-        previews_layout = QHBoxLayout()
-        previews_layout.setSpacing(15)
-        
-        self.original_preview = VideoPreviewWidget("Original Video")
-        self.compressed_preview = VideoPreviewWidget("Compressed Video")
-        
-        previews_layout.addWidget(self.original_preview)
-        previews_layout.addWidget(self.compressed_preview)
-        
-        layout.addLayout(previews_layout)
-        
-        controls_frame = QFrame()
-        controls_frame.setStyleSheet("""
-            QFrame {
-                background-color: #333;
-                border-radius: 8px;
-                padding: 15px;
-                margin-top: 10px;
-            }
-        """)
-        controls_layout = QHBoxLayout(controls_frame)
-        
-        self.compress_btn = QPushButton("🚀 Start HiNeRV Compression")
-        self.compress_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                           stop:0 #2196F3, stop:1 #1976D2);
-                color: white;
-                border: none;
-                padding: 15px 30px;
-                border-radius: 8px;
-                font-size: 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                           stop:0 #1976D2, stop:1 #1565C0);
-            }
-            QPushButton:pressed {
-                background: #1565C0;
-            }
-        """)
-        self.compress_btn.clicked.connect(self.start_compression)
-        controls_layout.addWidget(self.compress_btn)
-        
-        self.stop_btn = QPushButton("⏹ Stop Processing")
-        self.stop_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                           stop:0 #f44336, stop:1 #d32f2f);
-                color: white;
-                border: none;
-                padding: 15px 30px;
-                border-radius: 8px;
-                font-size: 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                           stop:0 #d32f2f, stop:1 #c62828);
-            }
-            QPushButton:pressed {
-                background: #c62828;
-            }
-        """)
-        self.stop_btn.clicked.connect(self.stop_compression)
-        self.stop_btn.setVisible(False)
-        controls_layout.addWidget(self.stop_btn)
-        
-        layout.addWidget(controls_frame)
-        
-        return widget
-    
     def create_progress_section(self):
         widget = QGroupBox("Processing Progress")
         widget.setStyleSheet("""
@@ -1403,211 +1309,6 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.progress_bar)
         
         return widget
-    
-    def create_results_section(self):
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        
-        title_label = QLabel("🎯 Compression Results & Analysis")
-        title_label.setAlignment(Qt.AlignCenter)
-        title_label.setStyleSheet("""
-            font-size: 22px;
-            font-weight: bold;
-            color: #4CAF50;
-            padding: 12px;
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
-                        stop:0 #2b2b2b, stop:0.5 #333, stop:1 #2b2b2b);
-            border-radius: 8px;
-            margin-bottom: 10px;
-        """)
-        layout.addWidget(title_label)
-        
-        tabs = QTabWidget()
-        tabs.setStyleSheet("""
-            QTabWidget::pane {
-                border: 2px solid #444;
-                background-color: #2b2b2b;
-                border-radius: 8px;
-            }
-            QTabBar::tab {
-                background-color: #333;
-                color: #ddd;
-                padding: 10px 20px;
-                margin-right: 2px;
-                border-top-left-radius: 6px;
-                border-top-right-radius: 6px;
-                font-weight: bold;
-            }
-            QTabBar::tab:selected {
-                background-color: #4CAF50;
-                color: white;
-            }
-            QTabBar::tab:hover {
-                background-color: #555;
-            }
-        """)
-        
-        overview_tab = self.create_overview_tab()
-        charts_tab = self.create_charts_tab()
-        details_tab = self.create_details_tab()
-        
-        tabs.addTab(overview_tab, "📊 Overview")
-        tabs.addTab(charts_tab, "📈 Charts")
-        tabs.addTab(details_tab, "📋 Details")
-        
-        layout.addWidget(tabs)
-        
-        actions_frame = self.create_actions_frame()
-        layout.addWidget(actions_frame)
-        
-        return widget
-    
-    def create_overview_tab(self):
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        
-        metrics_frame = QFrame()
-        metrics_frame.setStyleSheet("""
-            QFrame {
-                background-color: #333;
-                border-radius: 8px;
-                padding: 20px;
-            }
-        """)
-        metrics_layout = QGridLayout(metrics_frame)
-        metrics_layout.setSpacing(15)
-        
-        self.result_labels = {
-            'original_size': QLabel("Original Size: --"),
-            'compressed_size': QLabel("Compressed Size: --"),
-            'video_compression_ratio': QLabel("Compression Ratio: --"),
-            'video_space_saved': QLabel("Space Saved: --"),
-            'avg_psnr': QLabel("Average PSNR: --"),
-            'total_batches': QLabel("Total Batches: --"),
-            'neural_success': QLabel("Neural Success: --"),
-            'processing_time': QLabel("Processing: Complete")
-        }
-        
-        row = 0
-        for key, label in self.result_labels.items():
-            label.setStyleSheet("""
-                font-size: 14px; 
-                color: #ddd; 
-                padding: 8px;
-                background-color: #2b2b2b;
-                border-radius: 4px;
-                border-left: 4px solid #4CAF50;
-                font-weight: 500;
-            """)
-            metrics_layout.addWidget(label, row // 2, row % 2)
-            row += 1
-        
-        layout.addWidget(metrics_frame)
-        
-        return widget
-    
-    def create_charts_tab(self):
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        
-        self.metrics_chart = MetricsChart(widget, width=12, height=8)
-        layout.addWidget(self.metrics_chart)
-        
-        return widget
-    
-    def create_details_tab(self):
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        
-        self.batch_details_text = QTextEdit()
-        self.batch_details_text.setStyleSheet("""
-            QTextEdit {
-                background-color: #2b2b2b;
-                color: #ddd;
-                border: 2px solid #444;
-                border-radius: 6px;
-                font-family: 'Consolas', 'Monaco', monospace;
-                font-size: 12px;
-                padding: 10px;
-            }
-        """)
-        self.batch_details_text.setReadOnly(True)
-        layout.addWidget(self.batch_details_text)
-        
-        return widget
-    
-    def create_actions_frame(self):
-        frame = QFrame()
-        frame.setStyleSheet("""
-            QFrame {
-                background-color: #333;
-                border-radius: 8px;
-                padding: 15px;
-                margin-top: 10px;
-            }
-        """)
-        layout = QGridLayout(frame)
-        layout.setSpacing(10)
-        
-        self.play_original_btn = QPushButton("▶ Play Original")
-        self.play_compressed_btn = QPushButton("▶ Play Compressed")
-        self.save_btn = QPushButton("💾 Save Video")
-        self.export_metrics_btn = QPushButton("📊 Export Metrics")
-        
-        buttons = [self.play_original_btn, self.play_compressed_btn, self.save_btn, self.export_metrics_btn]
-        
-        for i, btn in enumerate(buttons):
-            btn.setStyleSheet("""
-                QPushButton {
-                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                               stop:0 #555, stop:1 #444);
-                    color: white;
-                    border: 2px solid #666;
-                    padding: 12px 18px;
-                    border-radius: 6px;
-                    font-size: 13px;
-                    font-weight: bold;
-                }
-                QPushButton:hover {
-                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                               stop:0 #666, stop:1 #555);
-                    border-color: #777;
-                }
-                QPushButton:pressed {
-                    background: #444;
-                }
-            """)
-            layout.addWidget(btn, i // 2, i % 2)
-        
-        self.play_original_btn.clicked.connect(self.play_original)
-        self.play_compressed_btn.clicked.connect(self.play_compressed)
-        self.save_btn.clicked.connect(self.save_compressed)
-        self.export_metrics_btn.clicked.connect(self.export_metrics)
-        
-        new_btn = QPushButton("🔄 Compress Another Video")
-        new_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                           stop:0 #4CAF50, stop:1 #45a049);
-                color: white;
-                border: none;
-                padding: 15px 25px;
-                border-radius: 8px;
-                font-size: 15px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                           stop:0 #45a049, stop:1 #3d8b40);
-            }
-            QPushButton:pressed {
-                background: #3d8b40;
-            }
-        """)
-        new_btn.clicked.connect(self.reset_ui)
-        layout.addWidget(new_btn, 2, 0, 1, 2)
-        
-        return frame
     
     def apply_theme(self):
         self.setStyleSheet("""
@@ -1721,6 +1422,7 @@ class MainWindow(QMainWindow):
         if 'compressed_path' in results:
             self.compressed_preview.load_video(results['compressed_path'])
         
+        # Update metrics display including MSSIM total
         self.result_labels['original_size'].setText(
             f"Original: {self.format_size(results.get('original_size', 0))}"
         )
@@ -1742,6 +1444,14 @@ class MainWindow(QMainWindow):
         
         total_batches = results.get('total_batches', 0)
         self.result_labels['total_batches'].setText(f"Batches: {total_batches}")
+        
+        # Display MSSIM total if available
+        mssim_data = results.get('mssim', {})
+        total_mssim = mssim_data.get('total', 0)
+        if total_mssim > 0:
+            self.result_labels['total_mssim'].setText(f"MSSIM: {total_mssim:.4f}")
+        else:
+            self.result_labels['total_mssim'].setText("MSSIM: N/A")
         
         self.update_batch_details(results)
         self.metrics_chart.plot_compression_metrics(results)
@@ -1791,118 +1501,147 @@ class MainWindow(QMainWindow):
                 self.open_video_file(compressed_path)
     
     def open_video_file(self, file_path):
+        """
+        Updated video player to prioritize VLC for WSL environment
+        This function now tries VLC first since it's already installed
+        """
         success = False
         last_error = ""
         
-        # Try system default first
-        try:
-            if sys.platform.startswith('win'):
-                os.startfile(file_path)
-                return
-            elif sys.platform.startswith('darwin'):
-                subprocess.run(['open', file_path], check=True)
-                return
-            else:
-                subprocess.run(['xdg-open', file_path], check=True, 
-                             stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
-                return
-        except Exception as e:
-            last_error = str(e)
+        # Try VLC first since it's confirmed to be installed in WSL
+        vlc_commands = [
+            ['vlc', file_path],  # Standard VLC command
+            ['/usr/bin/vlc', file_path],  # Explicit path
+            ['vlc', '--intf', 'qt', file_path],  # Force GUI interface
+            ['vlc', '--play-and-exit', file_path]  # Play and exit when done
+        ]
         
-        # Try specific video players
-        video_players = []
-        if sys.platform.startswith('win'):
-            video_players = [
-                ['vlc.exe', file_path],
-                ['wmplayer.exe', file_path],
-                ['mpc-hc.exe', file_path],
-                ['mpc-hc64.exe', file_path],
-                ['potplayer.exe', file_path]
-            ]
-        elif sys.platform.startswith('darwin'):
-            video_players = [
-                ['open', '-a', 'VLC', file_path],
-                ['open', '-a', 'QuickTime Player', file_path],
-                ['open', '-a', 'IINA', file_path],
-                ['open', '-a', 'Elmedia Player', file_path]
-            ]
-        else:
-            # Linux/Unix systems
-            video_players = [
-                ['vlc', file_path],
-                ['mpv', file_path],
-                ['totem', file_path],
-                ['mplayer', file_path],
-                ['smplayer', file_path],
-                ['kaffeine', file_path],
-                ['dragon', file_path],
-                ['celluloid', file_path],
-                ['gnome-videos', file_path],
-                ['parole', file_path]
-            ]
-        
-        for player_cmd in video_players:
+        for vlc_cmd in vlc_commands:
             try:
-                # Check if player exists
-                if sys.platform.startswith('win'):
-                    result = subprocess.run(['where', player_cmd[0]], 
-                                          capture_output=True, text=True)
-                    if result.returncode != 0:
-                        continue
-                else:
-                    result = subprocess.run(['which', player_cmd[0]], 
-                                          capture_output=True, text=True)
-                    if result.returncode != 0:
-                        continue
-                
-                # Try to launch the player
-                subprocess.Popen(player_cmd, 
-                               stderr=subprocess.DEVNULL, 
-                               stdout=subprocess.DEVNULL)
-                success = True
-                break
+                # Check if VLC is available
+                result = subprocess.run(['which', vlc_cmd[0]], 
+                                      capture_output=True, text=True)
+                if result.returncode == 0:
+                    # VLC found, try to launch it
+                    subprocess.Popen(vlc_cmd,
+                                   stderr=subprocess.DEVNULL, 
+                                   stdout=subprocess.DEVNULL)
+                    logger.info(f"Successfully launched VLC with command: {' '.join(vlc_cmd)}")
+                    success = True
+                    break
             except Exception as e:
                 last_error = str(e)
+                logger.warning(f"Failed to launch VLC with {vlc_cmd[0]}: {e}")
                 continue
         
-        # Try flatpak apps on Linux
-        if not success and not sys.platform.startswith('win') and not sys.platform.startswith('darwin'):
-            flatpak_players = [
-                ['flatpak', 'run', 'org.videolan.VLC', file_path],
-                ['flatpak', 'run', 'io.github.celluloid_player.Celluloid', file_path],
-                ['flatpak', 'run', 'org.gnome.Totem', file_path]
-            ]
+        # If VLC didn't work, try other video players as fallback
+        if not success:
+            # Try system default first
+            try:
+                if sys.platform.startswith('win'):
+                    os.startfile(file_path)
+                    return
+                elif sys.platform.startswith('darwin'):
+                    subprocess.run(['open', file_path], check=True)
+                    return
+                else:
+                    subprocess.run(['xdg-open', file_path], check=True, 
+                                 stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                    return
+            except Exception as e:
+                last_error = str(e)
             
-            for player_cmd in flatpak_players:
+            # Try other video players as backup
+            video_players = []
+            if sys.platform.startswith('win'):
+                video_players = [
+                    ['wmplayer.exe', file_path],
+                    ['mpc-hc.exe', file_path],
+                    ['mpc-hc64.exe', file_path],
+                    ['potplayer.exe', file_path]
+                ]
+            elif sys.platform.startswith('darwin'):
+                video_players = [
+                    ['open', '-a', 'QuickTime Player', file_path],
+                    ['open', '-a', 'IINA', file_path],
+                    ['open', '-a', 'Elmedia Player', file_path]
+                ]
+            else:
+                # Linux/Unix systems (including WSL)
+                video_players = [
+                    ['mpv', file_path],
+                    ['totem', file_path],
+                    ['mplayer', file_path],
+                    ['smplayer', file_path],
+                    ['kaffeine', file_path],
+                    ['dragon', file_path],
+                    ['celluloid', file_path],
+                    ['gnome-videos', file_path],
+                    ['parole', file_path]
+                ]
+            
+            for player_cmd in video_players:
                 try:
-                    subprocess.run(['which', 'flatpak'], check=True, 
-                                 capture_output=True)
-                    subprocess.Popen(player_cmd,
+                    # Check if player exists
+                    if sys.platform.startswith('win'):
+                        result = subprocess.run(['where', player_cmd[0]], 
+                                              capture_output=True, text=True)
+                        if result.returncode != 0:
+                            continue
+                    else:
+                        result = subprocess.run(['which', player_cmd[0]], 
+                                              capture_output=True, text=True)
+                        if result.returncode != 0:
+                            continue
+                    
+                    # Try to launch the player
+                    subprocess.Popen(player_cmd, 
                                    stderr=subprocess.DEVNULL, 
                                    stdout=subprocess.DEVNULL)
                     success = True
                     break
-                except:
+                except Exception as e:
+                    last_error = str(e)
                     continue
-        
-        # Try snap apps on Linux
-        if not success and not sys.platform.startswith('win') and not sys.platform.startswith('darwin'):
-            snap_players = [
-                ['snap', 'run', 'vlc', file_path],
-                ['snap', 'run', 'mpv', file_path]
-            ]
             
-            for player_cmd in snap_players:
-                try:
-                    subprocess.run(['which', 'snap'], check=True, 
-                                 capture_output=True)
-                    subprocess.Popen(player_cmd,
-                                   stderr=subprocess.DEVNULL, 
-                                   stdout=subprocess.DEVNULL)
-                    success = True
-                    break
-                except:
-                    continue
+            # Try flatpak apps on Linux
+            if not success and not sys.platform.startswith('win') and not sys.platform.startswith('darwin'):
+                flatpak_players = [
+                    ['flatpak', 'run', 'org.videolan.VLC', file_path],
+                    ['flatpak', 'run', 'io.github.celluloid_player.Celluloid', file_path],
+                    ['flatpak', 'run', 'org.gnome.Totem', file_path]
+                ]
+                
+                for player_cmd in flatpak_players:
+                    try:
+                        subprocess.run(['which', 'flatpak'], check=True, 
+                                     capture_output=True)
+                        subprocess.Popen(player_cmd,
+                                       stderr=subprocess.DEVNULL, 
+                                       stdout=subprocess.DEVNULL)
+                        success = True
+                        break
+                    except:
+                        continue
+            
+            # Try snap apps on Linux
+            if not success and not sys.platform.startswith('win') and not sys.platform.startswith('darwin'):
+                snap_players = [
+                    ['snap', 'run', 'vlc', file_path],
+                    ['snap', 'run', 'mpv', file_path]
+                ]
+                
+                for player_cmd in snap_players:
+                    try:
+                        subprocess.run(['which', 'snap'], check=True, 
+                                     capture_output=True)
+                        subprocess.Popen(player_cmd,
+                                       stderr=subprocess.DEVNULL, 
+                                       stdout=subprocess.DEVNULL)
+                        success = True
+                        break
+                    except:
+                        continue
         
         # Final fallback: try browser
         if not success:
@@ -1917,8 +1656,9 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(
                 self, 
                 "Cannot Play Video", 
-                f"Unable to find a video player to open the file.\n"
-                f"Please install VLC, MPV, or another video player.\n\n"
+                f"Unable to find a working video player.\n"
+                f"VLC should be installed but couldn't be launched.\n"
+                f"Please check your VLC installation or install another video player.\n\n"
                 f"File location: {file_path}\n"
                 f"Last error: {last_error}"
             )
@@ -1943,6 +1683,10 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Success", f"Video saved to:\n{save_path}")
     
     def reset_ui(self):
+        """
+        Clean reset function to prepare for new compression
+        This helps ensure fresh state when starting over
+        """
         self.video_path = None
         self.output_dir = None
         self.precompressed_mode = False
@@ -1954,13 +1698,13 @@ class MainWindow(QMainWindow):
         
         self.upload_widget.setVisible(True)
         
-        self.upload_area.setText("Drag and drop a video file here\nor click to browse")
+        self.upload_area.setText("Drag and drop a video file here or click to browse")
         self.upload_area.setStyleSheet("""
             QLabel {
                 background-color: #2b2b2b;
-                border: 3px dashed #666;
-                border-radius: 12px;
-                font-size: 18px;
+                border: 2px dashed #666;
+                border-radius: 8px;
+                font-size: 14px;
                 color: #bbb;
                 font-weight: 500;
             }
@@ -1974,11 +1718,11 @@ class MainWindow(QMainWindow):
         self.compress_btn.setVisible(True)
         self.stop_btn.setVisible(False)
         
-        self.comparison_widget.setVisible(False)
+        self.main_tabs.setVisible(False)
         self.progress_widget.setVisible(False)
-        self.results_widget.setVisible(False)
     
     def format_size(self, size_bytes):
+        """Helper function to format file sizes in human readable format"""
         for unit in ['B', 'KB', 'MB', 'GB']:
             if size_bytes < 1024.0:
                 return f"{size_bytes:.2f} {unit}"
@@ -2016,10 +1760,15 @@ class MainWindow(QMainWindow):
             event.accept()
 
     def update_batch_details(self, results):
+        """
+        Updated batch details to include MSSIM information
+        This provides more comprehensive analysis including quality metrics
+        """
         details_text = "HiNeRV Batch Processing Analysis\n"
         details_text += "=" * 60 + "\n\n"
         
         batch_metrics = results.get('batch_metrics', [])
+        mssim_data = results.get('mssim', {})
         
         for batch in batch_metrics:
             if not batch:
@@ -2031,10 +1780,18 @@ class MainWindow(QMainWindow):
             
             details_text += f"Batch {batch_idx + 1:3d}: Frames {frame_range:>10} ({frame_count:2d} frames)\n"
             
+            # Display PSNR if available
             training = batch.get('training_metrics', {})
             if 'final_psnr' in training and training['final_psnr'] > 0:
                 details_text += f"             Training PSNR: {training['final_psnr']:6.2f} dB\n"
             
+            # Display MSSIM if available
+            batch_key = f"batch_{batch_idx + 1}"
+            if batch_key in mssim_data:
+                mssim_score = mssim_data[batch_key]
+                details_text += f"             MSSIM Score: {mssim_score:8.4f}\n"
+            
+            # Display compression info
             compression = batch.get('compression_metrics', {})
             if 'compression_ratio' in compression:
                 ratio = compression['compression_ratio']
@@ -2058,12 +1815,21 @@ class MainWindow(QMainWindow):
         if results.get('avg_psnr', 0) > 0:
             details_text += f"- Average PSNR: {results['avg_psnr']:.2f} dB\n"
         
+        # Add MSSIM total if available
+        total_mssim = mssim_data.get('total', 0)
+        if total_mssim > 0:
+            details_text += f"- Overall MSSIM: {total_mssim:.4f}\n"
+        
         details_text += f"- Overall compression ratio: {results.get('video_compression_ratio', 1):.2f}x\n"
         details_text += f"- Total space saved: {results.get('video_space_saved', 0)*100:.1f}%\n"
         
         self.batch_details_text.setPlainText(details_text)
 
     def export_metrics(self):
+        """
+        Enhanced metrics export that includes MSSIM data
+        Provides comprehensive output for analysis and research
+        """
         if not hasattr(self, 'compression_results'):
             return
         
@@ -2095,22 +1861,34 @@ class MainWindow(QMainWindow):
                         f.write(f"  Compression Ratio: {results.get('video_compression_ratio', 0):.2f}x\n")
                         f.write(f"  Space Saved: {results.get('video_space_saved', 0)*100:.1f}%\n\n")
                         
+                        f.write("Quality Metrics:\n")
+                        if results.get('avg_psnr', 0) > 0:
+                            f.write(f"  Average PSNR: {results['avg_psnr']:.2f} dB\n")
+                        
+                        # Include MSSIM metrics in export
+                        mssim_data = results.get('mssim', {})
+                        if 'total' in mssim_data:
+                            f.write(f"  Overall MSSIM: {mssim_data['total']:.4f}\n")
+                        f.write("\n")
+                        
                         f.write("Processing Details:\n")
                         f.write(f"  Total Batches: {results.get('total_batches', 0)}\n")
                         f.write(f"  Batch Size: {results.get('batch_size', 0)} frames\n")
                         f.write(f"  Total Frames: {results.get('total_frames_processed', 0)}\n")
                         f.write(f"  Neural Success: {results.get('total_batches', 0) - results.get('fallback_batches', 0)}/{results.get('total_batches', 0)} batches\n\n")
                         
-                        if results.get('avg_psnr', 0) > 0:
-                            f.write(f"Quality Metrics:\n")
-                            f.write(f"  Average PSNR: {results['avg_psnr']:.2f} dB\n\n")
-                        
                         f.write("Batch Analysis:\n")
                         batch_metrics = results.get('batch_metrics', [])
                         for batch in batch_metrics:
                             if batch:
-                                f.write(f"  Batch {batch.get('batch_idx', 0) + 1}: ")
+                                batch_idx = batch.get('batch_idx', 0)
+                                f.write(f"  Batch {batch_idx + 1}: ")
                                 f.write(f"Frames {batch.get('frame_range', '--')} ")
+                                
+                                # Include MSSIM in batch analysis
+                                batch_key = f"batch_{batch_idx + 1}"
+                                if batch_key in mssim_data:
+                                    f.write(f"MSSIM: {mssim_data[batch_key]:.4f} ")
                                 
                                 compression = batch.get('compression_metrics', {})
                                 if compression.get('fallback_used', False):
@@ -2126,9 +1904,14 @@ class MainWindow(QMainWindow):
 
 
 def main():
+    """
+    Main entry point for the HiNeRV Video Compressor application
+    Sets up the Qt application and launches the main window
+    """
     app = QApplication(sys.argv)
     app.setApplicationName("HiNeRV Video Compressor - Professional Edition")
     
+    # Use Fusion style for better cross-platform appearance
     app.setStyle("Fusion")
     
     window = MainWindow()

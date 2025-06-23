@@ -659,11 +659,65 @@ class VideoProcessor(QThread):
         self.is_running = False
 
 
+class VideoLoadWorker(QThread):
+    """Background worker for loading video information without blocking UI"""
+    video_loaded = Signal(dict)  # Signal to emit video info
+    error_occurred = Signal(str)
+    
+    def __init__(self, video_path):
+        super().__init__()
+        self.video_path = video_path
+        
+    def run(self):
+        try:
+            video_info = {}
+            video_info['path'] = self.video_path
+            
+            # Load video properties using OpenCV in background thread
+            cap = cv2.VideoCapture(self.video_path)
+            if cap.isOpened():
+                video_info['width'] = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                video_info['height'] = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                video_info['fps'] = cap.get(cv2.CAP_PROP_FPS)
+                video_info['frame_count'] = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                video_info['duration'] = video_info['frame_count'] / video_info['fps'] if video_info['fps'] > 0 else 0
+                
+                # Get a preview frame from the middle of the video
+                cap.set(cv2.CAP_PROP_POS_FRAMES, video_info['frame_count'] // 2)
+                ret, frame = cap.read()
+                if ret:
+                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    h, w, ch = frame_rgb.shape
+                    bytes_per_line = ch * w
+                    
+                    from PySide6.QtGui import QImage
+                    q_image = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
+                    video_info['preview_image'] = q_image
+                
+                cap.release()
+            else:
+                video_info['width'] = 0
+                video_info['height'] = 0
+                video_info['fps'] = 0
+                video_info['frame_count'] = 0
+                video_info['duration'] = 0
+                video_info['preview_image'] = None
+            
+            # Get file size
+            video_info['size_bytes'] = os.path.getsize(self.video_path)
+            
+            self.video_loaded.emit(video_info)
+            
+        except Exception as e:
+            self.error_occurred.emit(f"Error loading video: {str(e)}")
+
+
 class VideoPreviewWidget(QWidget):
     def __init__(self, title="Video"):
         super().__init__()
         self.title = title
         self.video_info = VideoInfo()
+        self.load_worker = None
         self.setup_ui()
         
     def setup_ui(self):
@@ -694,6 +748,7 @@ class VideoPreviewWidget(QWidget):
             }
         """)
         self.preview_label.setAlignment(Qt.AlignCenter)
+        self.preview_label.setText("Loading...")  # Show loading text initially
         layout.addWidget(self.preview_label)
         
         info_frame = QFrame()
@@ -727,66 +782,64 @@ class VideoPreviewWidget(QWidget):
             row += 1
         
         layout.addWidget(info_frame)
-        info_layout.setSpacing(8)
-        
-        self.info_labels = {
-            'resolution': QLabel("Resolution: --"),
-            'fps': QLabel("FPS: --"),
-            'size': QLabel("Size: --"),
-            'duration': QLabel("Duration: --")
-        }
-        
-        row = 0
-        for key, label in self.info_labels.items():
-            label.setStyleSheet("""
-                color: #ddd; 
-                padding: 3px; 
-                font-size: 10px;
-                font-weight: 500;
-            """)
-            info_layout.addWidget(label, row // 2, row % 2)
-            row += 1
-        
-        layout.addWidget(info_frame)
     
     def load_video(self, video_path):
+        """Load video in background thread to prevent UI freezing"""
         if not os.path.exists(video_path):
+            self.preview_label.setText("Video file not found")
             return
         
-        self.video_info.path = video_path
+        # Stop any existing worker
+        if self.load_worker and self.load_worker.isRunning():
+            self.load_worker.quit()
+            self.load_worker.wait()
         
-        cap = cv2.VideoCapture(video_path)
-        if cap.isOpened():
-            self.video_info.width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            self.video_info.height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            self.video_info.fps = cap.get(cv2.CAP_PROP_FPS)
-            self.video_info.frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            self.video_info.duration = self.video_info.frame_count / self.video_info.fps if self.video_info.fps > 0 else 0
-            
-            cap.set(cv2.CAP_PROP_POS_FRAMES, self.video_info.frame_count // 2)
-            ret, frame = cap.read()
-            if ret:
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                h, w, ch = frame_rgb.shape
-                bytes_per_line = ch * w
-                
-                from PySide6.QtGui import QImage
-                q_image = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
-                pixmap = QPixmap.fromImage(q_image)
-                
-                scaled_pixmap = pixmap.scaled(
-                    self.preview_label.size(),
-                    Qt.KeepAspectRatio,
-                    Qt.SmoothTransformation
-                )
-                self.preview_label.setPixmap(scaled_pixmap)
-            
-            cap.release()
+        # Show loading state
+        self.preview_label.setText("Loading video...")
+        for label in self.info_labels.values():
+            label.setText(label.text().split(':')[0] + ": Loading...")
         
-        self.video_info.size_bytes = os.path.getsize(video_path)
+        # Start background loading
+        self.load_worker = VideoLoadWorker(video_path)
+        self.load_worker.video_loaded.connect(self.on_video_loaded)
+        self.load_worker.error_occurred.connect(self.on_video_error)
+        self.load_worker.start()
+    
+    def on_video_loaded(self, video_info):
+        """Handle video loaded signal from background thread"""
+        # Update video info object
+        self.video_info.path = video_info['path']
+        self.video_info.width = video_info['width']
+        self.video_info.height = video_info['height']
+        self.video_info.fps = video_info['fps']
+        self.video_info.frame_count = video_info['frame_count']
+        self.video_info.duration = video_info['duration']
+        self.video_info.size_bytes = video_info['size_bytes']
         self.video_info.size_str = self.format_size(self.video_info.size_bytes)
         
+        # Update preview image
+        if video_info.get('preview_image'):
+            pixmap = QPixmap.fromImage(video_info['preview_image'])
+            scaled_pixmap = pixmap.scaled(
+                self.preview_label.size(),
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation
+            )
+            self.preview_label.setPixmap(scaled_pixmap)
+        else:
+            self.preview_label.setText("No preview available")
+        
+        # Update info labels
         self.update_info()
+    
+    def on_video_error(self, error_msg):
+        """Handle video loading error"""
+        self.preview_label.setText(f"Error: {error_msg}")
+        logger.error(f"Video loading error: {error_msg}")
+        
+        # Reset info labels
+        for key, label in self.info_labels.items():
+            label.setText(f"{key.title()}: Error")
     
     def update_info(self):
         self.info_labels['resolution'].setText(f"Resolution: {self.video_info.width}x{self.video_info.height}")
@@ -811,7 +864,6 @@ class VideoPreviewWidget(QWidget):
         hours = minutes // 60
         mins = minutes % 60
         return f"{hours}h {mins}m {secs}s"
-
 
 class MainWindow(QMainWindow):
     def __init__(self):

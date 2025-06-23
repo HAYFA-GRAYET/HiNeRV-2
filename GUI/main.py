@@ -671,13 +671,13 @@ class VideoPreviewWidget(QWidget):
         # Title
         title_label = QLabel(self.title)
         title_label.setAlignment(Qt.AlignCenter)
-        title_label.setStyleSheet("font-size: 12px; font-weight: bold; padding: 3px;")
+        title_label.setStyleSheet("font-size: 14px; font-weight: bold; padding: 5px;")
         layout.addWidget(title_label)
         
-        # Video preview - optimized for laptop screens
+        # Video preview - larger when upload section is hidden
         self.preview_label = QLabel()
-        self.preview_label.setMinimumSize(300, 200)  # Reduced from 400x300
-        self.preview_label.setMaximumSize(450, 300)  # Reduced from 600x450
+        self.preview_label.setMinimumSize(400, 280)  # Increased from 300x200
+        self.preview_label.setMaximumSize(600, 400)  # Increased from 450x300
         self.preview_label.setScaledContents(True)
         self.preview_label.setStyleSheet("""
             QLabel {
@@ -689,17 +689,17 @@ class VideoPreviewWidget(QWidget):
         self.preview_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.preview_label)
         
-        # Video info - more compact
+        # Video info - readable size
         info_frame = QFrame()
         info_frame.setStyleSheet("""
             QFrame {
                 background-color: #333;
                 border-radius: 4px;
-                padding: 6px;
+                padding: 8px;
             }
         """)
         info_layout = QGridLayout(info_frame)
-        info_layout.setSpacing(2)
+        info_layout.setSpacing(3)
         
         self.info_labels = {
             'resolution': QLabel("Resolution: --"),
@@ -710,7 +710,7 @@ class VideoPreviewWidget(QWidget):
         
         row = 0
         for key, label in self.info_labels.items():
-            label.setStyleSheet("color: #ccc; padding: 1px; font-size: 11px;")
+            label.setStyleSheet("color: #ccc; padding: 2px; font-size: 12px;")
             info_layout.addWidget(label, row // 2, row % 2)
             row += 1
         
@@ -799,10 +799,11 @@ class MainWindow(QMainWindow):
         self.video_path = None
         self.output_dir = None
         self.processor = None
-        self.precompressed_mode = False  # NEW: Track if we're in precompressed mode
+        self.precompressed_mode = False  
+        self.upload_widget = None  
         self.setup_ui()
         self.apply_theme()
-        self.setup_shortcuts()  # NEW: Set up keyboard shortcuts
+        self.setup_shortcuts() 
         
     def setup_ui(self):
         """Set up the user interface optimized for laptop screens"""
@@ -838,9 +839,9 @@ class MainWindow(QMainWindow):
         """)
         main_layout.addWidget(batch_info)
         
-        # Upload section
-        upload_widget = self.create_upload_section()
-        main_layout.addWidget(upload_widget)
+        # Upload section - store reference for hiding
+        self.upload_widget = self.create_upload_section()
+        main_layout.addWidget(self.upload_widget)
         
         # Video comparison section
         self.comparison_widget = self.create_comparison_section()
@@ -980,16 +981,16 @@ class MainWindow(QMainWindow):
         widget = QWidget()
         layout = QVBoxLayout(widget)
         
-        # Video previews with improved sizing
+        # Video previews with improved sizing for full screen usage
         previews_layout = QHBoxLayout()
         
         self.original_preview = VideoPreviewWidget("Original Video")
         self.compressed_preview = VideoPreviewWidget("Compressed Video")
         
-        # Set maximum sizes for laptop screens
+        # Larger sizes when upload section is hidden
         for preview in [self.original_preview, self.compressed_preview]:
-            preview.setMaximumHeight(350)  # Reduced from default
-            preview.setMinimumHeight(280)  # Ensure minimum visibility
+            preview.setMaximumHeight(450)  # Increased when upload is hidden
+            preview.setMinimumHeight(350)  # Increased minimum
         
         previews_layout.addWidget(self.original_preview)
         previews_layout.addWidget(self.compressed_preview)
@@ -1047,6 +1048,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.stop_btn, alignment=Qt.AlignCenter)
         
         return widget
+
 
     def create_progress_section(self):
         """Create progress section"""
@@ -1517,6 +1519,10 @@ class MainWindow(QMainWindow):
         if self.processor and self.processor.isRunning():
             self.processor.stop()
             self.processor.wait(5000)
+        
+        # Show upload section again
+        if self.upload_widget:
+            self.upload_widget.setVisible(True)
         
         # Reset upload area
         self.upload_area.setText("Drag and drop a video file here\nor click to browse")

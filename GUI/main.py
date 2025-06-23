@@ -668,28 +668,29 @@ class VideoPreviewWidget(QWidget):
         
     def setup_ui(self):
         layout = QVBoxLayout(self)
+        layout.setSpacing(6)
         
         title_label = QLabel(self.title)
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setStyleSheet("""
-            font-size: 16px; 
+            font-size: 12px; 
             font-weight: bold; 
-            padding: 8px;
+            padding: 6px;
             background-color: #333;
-            border-radius: 4px;
-            margin-bottom: 5px;
+            border-radius: 3px;
+            margin-bottom: 4px;
         """)
         layout.addWidget(title_label)
         
         self.preview_label = QLabel()
-        self.preview_label.setMinimumSize(500, 350)
-        self.preview_label.setMaximumSize(800, 600)
+        self.preview_label.setMinimumSize(400, 280)
+        self.preview_label.setMaximumSize(600, 420)
         self.preview_label.setScaledContents(True)
         self.preview_label.setStyleSheet("""
             QLabel {
                 background-color: #2b2b2b;
                 border: 2px solid #444;
-                border-radius: 8px;
+                border-radius: 6px;
             }
         """)
         self.preview_label.setAlignment(Qt.AlignCenter)
@@ -699,12 +700,33 @@ class VideoPreviewWidget(QWidget):
         info_frame.setStyleSheet("""
             QFrame {
                 background-color: #333;
-                border-radius: 6px;
-                padding: 12px;
-                margin-top: 8px;
+                border-radius: 4px;
+                padding: 8px;
+                margin-top: 4px;
             }
         """)
         info_layout = QGridLayout(info_frame)
+        info_layout.setSpacing(4)
+        
+        self.info_labels = {
+            'resolution': QLabel("Resolution: --"),
+            'fps': QLabel("FPS: --"),
+            'size': QLabel("Size: --"),
+            'duration': QLabel("Duration: --")
+        }
+        
+        row = 0
+        for key, label in self.info_labels.items():
+            label.setStyleSheet("""
+                color: #ddd; 
+                padding: 3px; 
+                font-size: 10px;
+                font-weight: 500;
+            """)
+            info_layout.addWidget(label, row // 2, row % 2)
+            row += 1
+        
+        layout.addWidget(info_frame)
         info_layout.setSpacing(8)
         
         self.info_labels = {
@@ -805,44 +827,59 @@ class MainWindow(QMainWindow):
         self.setup_shortcuts() 
         
     def setup_ui(self):
-        self.setWindowTitle("HiNeRV Video Compressor - Professional Edition")
-        self.setMinimumSize(1200, 800)
-        self.setMaximumSize(1600, 1000)
+        self.setWindowTitle("HiNeRV Video Compressor")
+        self.setMinimumSize(1200, 700)
+        self.setMaximumSize(1600, 900)
         
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
-        main_layout.setSpacing(10)
-        main_layout.setContentsMargins(15, 15, 15, 15)
-        
-        header = QLabel("HiNeRV Neural Video Compressor")
-        header.setAlignment(Qt.AlignCenter)
-        header.setStyleSheet("""
-            font-size: 28px;
-            font-weight: bold;
-            color: #4CAF50;
-            padding: 12px;
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
-                        stop:0 #2b2b2b, stop:0.5 #333, stop:1 #2b2b2b);
-            border-radius: 8px;
-            margin-bottom: 5px;
-        """)
-        main_layout.addWidget(header)
+        main_layout.setSpacing(8)
+        main_layout.setContentsMargins(10, 10, 10, 10)
         
         self.upload_widget = self.create_upload_section()
         main_layout.addWidget(self.upload_widget)
         
-        self.comparison_widget = self.create_comparison_section()
-        self.comparison_widget.setVisible(False)
-        main_layout.addWidget(self.comparison_widget)
+        self.main_tabs = QTabWidget()
+        self.main_tabs.setStyleSheet("""
+            QTabWidget::pane {
+                border: 1px solid #444;
+                background-color: #2b2b2b;
+                border-radius: 6px;
+            }
+            QTabBar::tab {
+                background-color: #333;
+                color: #ddd;
+                padding: 8px 16px;
+                margin-right: 1px;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+                font-size: 12px;
+                font-weight: bold;
+            }
+            QTabBar::tab:selected {
+                background-color: #4CAF50;
+                color: white;
+            }
+            QTabBar::tab:hover {
+                background-color: #555;
+            }
+        """)
+        self.main_tabs.setVisible(False)
+        
+        # Video comparison tab
+        self.comparison_tab = self.create_comparison_tab()
+        self.main_tabs.addTab(self.comparison_tab, "📹 Video Comparison")
+        
+        # Results and charts tab
+        self.results_tab = self.create_results_tab()
+        self.main_tabs.addTab(self.results_tab, "📊 Results & Analysis")
+        
+        main_layout.addWidget(self.main_tabs)
         
         self.progress_widget = self.create_progress_section()
         self.progress_widget.setVisible(False)
         main_layout.addWidget(self.progress_widget)
-        
-        self.results_widget = self.create_results_section()
-        self.results_widget.setVisible(False)
-        main_layout.addWidget(self.results_widget)
         
         self.setAcceptDrops(True)
     
@@ -854,22 +891,22 @@ class MainWindow(QMainWindow):
         widget = QGroupBox("Upload Video")
         widget.setStyleSheet("""
             QGroupBox {
-                font-size: 18px;
+                font-size: 14px;
                 font-weight: bold;
-                padding-top: 15px;
+                padding-top: 12px;
             }
         """)
         layout = QVBoxLayout(widget)
         
-        self.upload_area = QLabel("Drag and drop a video file here\nor click to browse")
-        self.upload_area.setMinimumHeight(180)
+        self.upload_area = QLabel("Drag and drop a video file here or click to browse")
+        self.upload_area.setMinimumHeight(120)
         self.upload_area.setAlignment(Qt.AlignCenter)
         self.upload_area.setStyleSheet("""
             QLabel {
                 background-color: #2b2b2b;
-                border: 3px dashed #666;
-                border-radius: 12px;
-                font-size: 18px;
+                border: 2px dashed #666;
+                border-radius: 8px;
+                font-size: 14px;
                 color: #bbb;
                 font-weight: 500;
             }
@@ -890,31 +927,287 @@ class MainWindow(QMainWindow):
                            stop:0 #4CAF50, stop:1 #45a049);
                 color: white;
                 border: none;
-                padding: 12px 25px;
-                border-radius: 6px;
-                font-size: 16px;
+                padding: 8px 20px;
+                border-radius: 4px;
+                font-size: 12px;
                 font-weight: bold;
             }
             QPushButton:hover {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                            stop:0 #45a049, stop:1 #3d8b40);
             }
-            QPushButton:pressed {
-                background: #3d8b40;
-            }
         """)
         browse_btn.clicked.connect(self.browse_video)
         layout.addWidget(browse_btn, alignment=Qt.AlignCenter)
         
-        shortcut_hint = QLabel("Advanced: Press Ctrl+Shift+L to load pre-compressed video with metrics")
+        shortcut_hint = QLabel("Advanced: Ctrl+Shift+L to load pre-compressed video")
         shortcut_hint.setAlignment(Qt.AlignCenter)
         shortcut_hint.setStyleSheet("""
-            font-size: 11px;
+            font-size: 10px;
             color: #888;
-            padding: 8px;
+            padding: 5px;
             font-style: italic;
         """)
         layout.addWidget(shortcut_hint)
+        
+        return widget
+    
+    def create_comparison_tab(self):
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setSpacing(8)
+        
+        # Video previews
+        previews_layout = QHBoxLayout()
+        previews_layout.setSpacing(10)
+        
+        self.original_preview = VideoPreviewWidget("Original Video")
+        self.compressed_preview = VideoPreviewWidget("Compressed Video")
+        
+        previews_layout.addWidget(self.original_preview)
+        previews_layout.addWidget(self.compressed_preview)
+        
+        layout.addLayout(previews_layout)
+        
+        # Control buttons
+        controls_frame = QFrame()
+        controls_frame.setStyleSheet("""
+            QFrame {
+                background-color: #333;
+                border-radius: 6px;
+                padding: 10px;
+            }
+        """)
+        controls_layout = QHBoxLayout(controls_frame)
+        controls_layout.setSpacing(10)
+        
+        self.compress_btn = QPushButton("Start Compression")
+        self.compress_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                           stop:0 #2196F3, stop:1 #1976D2);
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 4px;
+                font-size: 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                           stop:0 #1976D2, stop:1 #1565C0);
+            }
+        """)
+        self.compress_btn.clicked.connect(self.start_compression)
+        controls_layout.addWidget(self.compress_btn)
+        
+        self.stop_btn = QPushButton("Stop Processing")
+        self.stop_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                           stop:0 #f44336, stop:1 #d32f2f);
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 4px;
+                font-size: 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                           stop:0 #d32f2f, stop:1 #c62828);
+            }
+        """)
+        self.stop_btn.clicked.connect(self.stop_compression)
+        self.stop_btn.setVisible(False)
+        controls_layout.addWidget(self.stop_btn)
+        
+        controls_layout.addStretch()
+        
+        # Video control buttons
+        self.play_original_btn = QPushButton("▶ Play Original")
+        self.play_compressed_btn = QPushButton("▶ Play Compressed")
+        
+        video_controls = [self.play_original_btn, self.play_compressed_btn]
+        for btn in video_controls:
+            btn.setStyleSheet("""
+                QPushButton {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                               stop:0 #555, stop:1 #444);
+                    color: white;
+                    border: 1px solid #666;
+                    padding: 8px 15px;
+                    border-radius: 4px;
+                    font-size: 11px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                               stop:0 #666, stop:1 #555);
+                }
+            """)
+            controls_layout.addWidget(btn)
+        
+        self.play_original_btn.clicked.connect(self.play_original)
+        self.play_compressed_btn.clicked.connect(self.play_compressed)
+        
+        layout.addWidget(controls_frame)
+        
+        return widget
+    
+    def create_results_tab(self):
+        widget = QWidget()
+        layout = QHBoxLayout(widget)
+        layout.setSpacing(10)
+        
+        # Left side - Metrics and overview
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setSpacing(8)
+        
+        # Key metrics
+        metrics_frame = QFrame()
+        metrics_frame.setStyleSheet("""
+            QFrame {
+                background-color: #333;
+                border-radius: 6px;
+                padding: 12px;
+            }
+        """)
+        metrics_layout = QGridLayout(metrics_frame)
+        metrics_layout.setSpacing(8)
+        
+        self.result_labels = {
+            'original_size': QLabel("Original: --"),
+            'compressed_size': QLabel("Compressed: --"),
+            'video_compression_ratio': QLabel("Ratio: --"),
+            'video_space_saved': QLabel("Saved: --"),
+            'avg_psnr': QLabel("PSNR: --"),
+            'total_batches': QLabel("Batches: --")
+        }
+        
+        row = 0
+        for key, label in self.result_labels.items():
+            label.setStyleSheet("""
+                font-size: 11px; 
+                color: #ddd; 
+                padding: 6px;
+                background-color: #2b2b2b;
+                border-radius: 3px;
+                border-left: 3px solid #4CAF50;
+                font-weight: 500;
+            """)
+            metrics_layout.addWidget(label, row // 2, row % 2)
+            row += 1
+        
+        left_layout.addWidget(metrics_frame)
+        
+        # Batch details
+        details_frame = QFrame()
+        details_frame.setStyleSheet("""
+            QFrame {
+                background-color: #333;
+                border-radius: 6px;
+                padding: 8px;
+            }
+        """)
+        details_layout = QVBoxLayout(details_frame)
+        
+        details_title = QLabel("Batch Analysis")
+        details_title.setStyleSheet("""
+            font-size: 12px; 
+            font-weight: bold; 
+            color: #4CAF50; 
+            padding: 4px;
+        """)
+        details_layout.addWidget(details_title)
+        
+        self.batch_details_text = QTextEdit()
+        self.batch_details_text.setStyleSheet("""
+            QTextEdit {
+                background-color: #2b2b2b;
+                color: #ccc;
+                border: 1px solid #555;
+                border-radius: 4px;
+                font-family: 'Consolas', 'Monaco', monospace;
+                font-size: 9px;
+                padding: 6px;
+            }
+        """)
+        self.batch_details_text.setReadOnly(True)
+        details_layout.addWidget(self.batch_details_text)
+        
+        left_layout.addWidget(details_frame)
+        
+        # Action buttons
+        actions_frame = QFrame()
+        actions_frame.setStyleSheet("""
+            QFrame {
+                background-color: #333;
+                border-radius: 6px;
+                padding: 8px;
+            }
+        """)
+        actions_layout = QGridLayout(actions_frame)
+        actions_layout.setSpacing(6)
+        
+        self.save_btn = QPushButton("Save Video")
+        self.export_metrics_btn = QPushButton("Export Metrics")
+        self.new_compression_btn = QPushButton("New Compression")
+        
+        action_buttons = [self.save_btn, self.export_metrics_btn, self.new_compression_btn]
+        
+        for i, btn in enumerate(action_buttons):
+            btn.setStyleSheet("""
+                QPushButton {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                               stop:0 #555, stop:1 #444);
+                    color: white;
+                    border: 1px solid #666;
+                    padding: 8px 12px;
+                    border-radius: 4px;
+                    font-size: 10px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                               stop:0 #666, stop:1 #555);
+                }
+            """)
+            actions_layout.addWidget(btn, i // 2, i % 2)
+        
+        if len(action_buttons) % 2:
+            actions_layout.addWidget(QWidget(), (len(action_buttons)) // 2, 1)
+        
+        self.save_btn.clicked.connect(self.save_compressed)
+        self.export_metrics_btn.clicked.connect(self.export_metrics)
+        self.new_compression_btn.clicked.connect(self.reset_ui)
+        
+        left_layout.addWidget(actions_frame)
+        
+        # Right side - Charts
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        
+        charts_title = QLabel("Performance Charts")
+        charts_title.setAlignment(Qt.AlignCenter)
+        charts_title.setStyleSheet("""
+            font-size: 14px;
+            font-weight: bold;
+            color: #4CAF50;
+            padding: 8px;
+            background-color: #333;
+            border-radius: 4px;
+            margin-bottom: 5px;
+        """)
+        right_layout.addWidget(charts_title)
+        
+        self.metrics_chart = MetricsChart(right_panel, width=8, height=6)
+        right_layout.addWidget(self.metrics_chart)
+        
+        # Set panel proportions
+        layout.addWidget(left_panel, 1)
+        layout.addWidget(right_panel, 2)
         
         return widget
     
@@ -1070,23 +1363,24 @@ class MainWindow(QMainWindow):
         widget = QGroupBox("Processing Progress")
         widget.setStyleSheet("""
             QGroupBox {
-                font-size: 16px;
+                font-size: 12px;
                 font-weight: bold;
-                padding-top: 15px;
+                padding-top: 10px;
                 background-color: #2b2b2b;
-                border-radius: 8px;
+                border-radius: 6px;
             }
         """)
         layout = QVBoxLayout(widget)
+        layout.setSpacing(6)
         
         self.status_label = QLabel("Initializing...")
         self.status_label.setStyleSheet("""
-            font-size: 16px; 
+            font-size: 12px; 
             color: #ddd; 
-            padding: 8px;
+            padding: 6px;
             background-color: #333;
-            border-radius: 4px;
-            margin-bottom: 5px;
+            border-radius: 3px;
+            margin-bottom: 3px;
         """)
         layout.addWidget(self.status_label)
         
@@ -1094,16 +1388,16 @@ class MainWindow(QMainWindow):
         self.progress_bar.setStyleSheet("""
             QProgressBar {
                 border: 2px solid #555;
-                border-radius: 8px;
+                border-radius: 6px;
                 text-align: center;
-                height: 30px;
-                font-size: 14px;
+                height: 24px;
+                font-size: 11px;
                 font-weight: bold;
             }
             QProgressBar::chunk {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
                            stop:0 #4CAF50, stop:1 #45a049);
-                border-radius: 6px;
+                border-radius: 4px;
             }
         """)
         layout.addWidget(self.progress_bar)
@@ -1357,15 +1651,15 @@ class MainWindow(QMainWindow):
         self.upload_area.setStyleSheet("""
             QLabel {
                 background-color: #2b2b2b;
-                border: 3px solid #4CAF50;
-                border-radius: 12px;
-                font-size: 16px;
+                border: 2px solid #4CAF50;
+                border-radius: 8px;
+                font-size: 12px;
                 color: #4CAF50;
                 font-weight: bold;
             }
         """)
         
-        self.comparison_widget.setVisible(True)
+        self.main_tabs.setVisible(True)
         self.original_preview.load_video(file_path)
     
     def start_compression(self):
@@ -1376,7 +1670,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(
                 self, 
                 "Pre-compressed Mode", 
-                "This video was loaded with pre-existing compression results.\nUse 'Compress Another Video' to start fresh."
+                "This video was loaded with pre-existing compression results.\nUse 'New Compression' to start fresh."
             )
             return
         
@@ -1390,7 +1684,6 @@ class MainWindow(QMainWindow):
         self.compress_btn.setVisible(False)
         self.stop_btn.setVisible(True)
         self.progress_widget.setVisible(True)
-        self.results_widget.setVisible(False)
         
         self.processor = VideoProcessor(str(self.video_path), str(self.output_dir), batch_size=40)
         self.processor.progress.connect(self.update_progress)
@@ -1419,7 +1712,9 @@ class MainWindow(QMainWindow):
         self.compress_btn.setVisible(True)
         self.stop_btn.setVisible(False)
         self.progress_widget.setVisible(False)
-        self.results_widget.setVisible(True)
+        
+        # Switch to results tab
+        self.main_tabs.setCurrentIndex(1)
         
         self.compression_results = results
         
@@ -1427,66 +1722,42 @@ class MainWindow(QMainWindow):
             self.compressed_preview.load_video(results['compressed_path'])
         
         self.result_labels['original_size'].setText(
-            f"Original Size: {self.format_size(results.get('original_size', 0))}"
+            f"Original: {self.format_size(results.get('original_size', 0))}"
         )
         self.result_labels['compressed_size'].setText(
-            f"Compressed Size: {self.format_size(results.get('compressed_size', 0))}"
+            f"Compressed: {self.format_size(results.get('compressed_size', 0))}"
         )
         self.result_labels['video_compression_ratio'].setText(
-            f"Compression Ratio: {results.get('video_compression_ratio', 0):.2f}x"
+            f"Ratio: {results.get('video_compression_ratio', 0):.2f}x"
         )
         self.result_labels['video_space_saved'].setText(
-            f"Space Saved: {results.get('video_space_saved', 0)*100:.1f}%"
+            f"Saved: {results.get('video_space_saved', 0)*100:.1f}%"
         )
         
         avg_psnr = results.get('avg_psnr', 0)
         if avg_psnr > 0:
-            self.result_labels['avg_psnr'].setText(f"Average PSNR: {avg_psnr:.2f} dB")
+            self.result_labels['avg_psnr'].setText(f"PSNR: {avg_psnr:.1f} dB")
         else:
-            self.result_labels['avg_psnr'].setText("Average PSNR: Not available")
+            self.result_labels['avg_psnr'].setText("PSNR: N/A")
         
         total_batches = results.get('total_batches', 0)
-        self.result_labels['total_batches'].setText(f"Total Batches: {total_batches}")
-        
-        fallback_count = results.get('fallback_batches', 0)
-        successful_neural = total_batches - fallback_count
-        
-        if successful_neural > 0:
-            self.result_labels['neural_success'].setText(f"Neural Success: {successful_neural}/{total_batches} batches")
-            self.result_labels['neural_success'].setStyleSheet("""
-                font-size: 14px; 
-                color: #4CAF50; 
-                padding: 8px;
-                background-color: #2b2b2b;
-                border-radius: 4px;
-                border-left: 4px solid #4CAF50;
-                font-weight: bold;
-            """)
-        else:
-            self.result_labels['neural_success'].setText(f"Neural Success: Failed")
-            self.result_labels['neural_success'].setStyleSheet("""
-                font-size: 14px; 
-                color: #f44336; 
-                padding: 8px;
-                background-color: #2b2b2b;
-                border-radius: 4px;
-                border-left: 4px solid #f44336;
-                font-weight: bold;
-            """)
+        self.result_labels['total_batches'].setText(f"Batches: {total_batches}")
         
         self.update_batch_details(results)
         self.metrics_chart.plot_compression_metrics(results)
         
+        fallback_count = results.get('fallback_batches', 0)
+        successful_neural = total_batches - fallback_count
         success_rate = (successful_neural / total_batches * 100) if total_batches > 0 else 0
         
         QMessageBox.information(
             self, 
-            "🎉 HiNeRV Compression Complete", 
-            f"Video compression completed successfully!\n\n"
-            f"📊 Processed {results.get('total_frames_processed', 0)} frames in {total_batches} batches\n"
-            f"🧠 Neural compression success: {success_rate:.1f}%\n"
-            f"📉 Overall compression ratio: {results.get('video_compression_ratio', 1):.2f}x\n"
-            f"💾 Space saved: {results.get('video_space_saved', 0)*100:.1f}%"
+            "Compression Complete", 
+            f"Video compression completed!\n\n"
+            f"Processed {results.get('total_frames_processed', 0)} frames in {total_batches} batches\n"
+            f"Neural compression success: {success_rate:.1f}%\n"
+            f"Compression ratio: {results.get('video_compression_ratio', 1):.2f}x\n"
+            f"Space saved: {results.get('video_space_saved', 0)*100:.1f}%"
         )
 
     def on_compression_error(self, error_msg):
@@ -1520,47 +1791,137 @@ class MainWindow(QMainWindow):
                 self.open_video_file(compressed_path)
     
     def open_video_file(self, file_path):
+        success = False
+        last_error = ""
+        
+        # Try system default first
         try:
             if sys.platform.startswith('win'):
                 os.startfile(file_path)
+                return
             elif sys.platform.startswith('darwin'):
                 subprocess.run(['open', file_path], check=True)
+                return
             else:
-                subprocess.run(['xdg-open', file_path], check=True)
+                subprocess.run(['xdg-open', file_path], check=True, 
+                             stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                return
         except Exception as e:
-            fallback_apps = []
+            last_error = str(e)
+        
+        # Try specific video players
+        video_players = []
+        if sys.platform.startswith('win'):
+            video_players = [
+                ['vlc.exe', file_path],
+                ['wmplayer.exe', file_path],
+                ['mpc-hc.exe', file_path],
+                ['mpc-hc64.exe', file_path],
+                ['potplayer.exe', file_path]
+            ]
+        elif sys.platform.startswith('darwin'):
+            video_players = [
+                ['open', '-a', 'VLC', file_path],
+                ['open', '-a', 'QuickTime Player', file_path],
+                ['open', '-a', 'IINA', file_path],
+                ['open', '-a', 'Elmedia Player', file_path]
+            ]
+        else:
+            # Linux/Unix systems
+            video_players = [
+                ['vlc', file_path],
+                ['mpv', file_path],
+                ['totem', file_path],
+                ['mplayer', file_path],
+                ['smplayer', file_path],
+                ['kaffeine', file_path],
+                ['dragon', file_path],
+                ['celluloid', file_path],
+                ['gnome-videos', file_path],
+                ['parole', file_path]
+            ]
+        
+        for player_cmd in video_players:
+            try:
+                # Check if player exists
+                if sys.platform.startswith('win'):
+                    result = subprocess.run(['where', player_cmd[0]], 
+                                          capture_output=True, text=True)
+                    if result.returncode != 0:
+                        continue
+                else:
+                    result = subprocess.run(['which', player_cmd[0]], 
+                                          capture_output=True, text=True)
+                    if result.returncode != 0:
+                        continue
+                
+                # Try to launch the player
+                subprocess.Popen(player_cmd, 
+                               stderr=subprocess.DEVNULL, 
+                               stdout=subprocess.DEVNULL)
+                success = True
+                break
+            except Exception as e:
+                last_error = str(e)
+                continue
+        
+        # Try flatpak apps on Linux
+        if not success and not sys.platform.startswith('win') and not sys.platform.startswith('darwin'):
+            flatpak_players = [
+                ['flatpak', 'run', 'org.videolan.VLC', file_path],
+                ['flatpak', 'run', 'io.github.celluloid_player.Celluloid', file_path],
+                ['flatpak', 'run', 'org.gnome.Totem', file_path]
+            ]
             
-            if sys.platform.startswith('win'):
-                fallback_apps = ['vlc.exe', 'wmplayer.exe', 'mpc-hc.exe']
-            elif sys.platform.startswith('darwin'):
-                fallback_apps = ['VLC', 'QuickTime Player', 'IINA']
-            else:
-                fallback_apps = ['vlc', 'mpv', 'totem', 'mplayer']
-            
-            success = False
-            for app in fallback_apps:
+            for player_cmd in flatpak_players:
                 try:
-                    if sys.platform.startswith('win'):
-                        subprocess.run([app, file_path], check=True)
-                    elif sys.platform.startswith('darwin'):
-                        subprocess.run(['open', '-a', app, file_path], check=True)
-                    else:
-                        subprocess.run([app, file_path], check=True)
+                    subprocess.run(['which', 'flatpak'], check=True, 
+                                 capture_output=True)
+                    subprocess.Popen(player_cmd,
+                                   stderr=subprocess.DEVNULL, 
+                                   stdout=subprocess.DEVNULL)
                     success = True
                     break
                 except:
                     continue
+        
+        # Try snap apps on Linux
+        if not success and not sys.platform.startswith('win') and not sys.platform.startswith('darwin'):
+            snap_players = [
+                ['snap', 'run', 'vlc', file_path],
+                ['snap', 'run', 'mpv', file_path]
+            ]
             
-            if not success:
-                file_url = f"file://{os.path.abspath(file_path)}"
+            for player_cmd in snap_players:
                 try:
-                    webbrowser.open(file_url)
+                    subprocess.run(['which', 'snap'], check=True, 
+                                 capture_output=True)
+                    subprocess.Popen(player_cmd,
+                                   stderr=subprocess.DEVNULL, 
+                                   stdout=subprocess.DEVNULL)
+                    success = True
+                    break
                 except:
-                    QMessageBox.warning(
-                        self, 
-                        "Cannot Play Video", 
-                        f"Unable to open video file. Please manually open:\n{file_path}"
-                    )
+                    continue
+        
+        # Final fallback: try browser
+        if not success:
+            try:
+                file_url = f"file://{os.path.abspath(file_path)}"
+                webbrowser.open(file_url)
+                success = True
+            except Exception as e:
+                last_error = str(e)
+        
+        if not success:
+            QMessageBox.warning(
+                self, 
+                "Cannot Play Video", 
+                f"Unable to find a video player to open the file.\n"
+                f"Please install VLC, MPV, or another video player.\n\n"
+                f"File location: {file_path}\n"
+                f"Last error: {last_error}"
+            )
     
     def save_compressed(self):
         if not hasattr(self, 'compression_results'):

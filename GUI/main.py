@@ -740,8 +740,8 @@ class VideoPreviewWidget(QWidget):
         for key, label in self.info_labels.items():
             label.setStyleSheet("""
                 color: #ddd; 
-                padding: 4px; 
-                font-size: 13px;
+                padding: 3px; 
+                font-size: 10px;
                 font-weight: 500;
             """)
             info_layout.addWidget(label, row // 2, row % 2)
@@ -1794,6 +1794,15 @@ class MainWindow(QMainWindow):
         success = False
         last_error = ""
         
+        # Convert WSL path to Windows path if needed
+        windows_path = self.convert_wsl_path_to_windows(file_path)
+        
+        # WSL-specific video playback methods
+        if self.is_wsl_environment():
+            success = self.try_wsl_video_playback(windows_path, file_path)
+            if success:
+                return
+        
         # Try system default first
         try:
             if sys.platform.startswith('win'):
@@ -1904,24 +1913,153 @@ class MainWindow(QMainWindow):
                 except:
                     continue
         
-        # Final fallback: try browser
         if not success:
+            # Show helpful dialog for WSL users
+            if self.is_wsl_environment():
+                QMessageBox.information(
+                    self, 
+                    "WSL Video Playback", 
+                    f"Cannot directly play video in WSL environment.\n\n"
+                    f"Options:\n"
+                    f"1. Copy this path to Windows: {windows_path}\n"
+                    f"2. Install a video player: sudo apt install vlc\n"
+                    f"3. Use Windows Subsystem for Linux GUI (WSLg)\n\n"
+                    f"File location: {file_path}"
+                )
+            else:
+                QMessageBox.warning(
+                    self, 
+                    "Cannot Play Video", 
+                    f"Unable to find a video player to open the file.\n"
+                    f"Please install VLC, MPV, or another video player.\n\n"
+                    f"File location: {file_path}\n"
+                    f"Last error: {last_error}"
+                )
+    
+    def is_wsl_environment(self):
+        """Check if running in WSL environment"""
+        try:
+            # Check for WSL-specific indicators
+            with open('/proc/version', 'r') as f:
+                version_info = f.read().lower()
+                return 'microsoft' in version_info or 'wsl' in version_info
+        except:
+            # Alternative check
             try:
-                file_url = f"file://{os.path.abspath(file_path)}"
-                webbrowser.open(file_url)
-                success = True
-            except Exception as e:
-                last_error = str(e)
+                result = subprocess.run(['uname', '-r'], capture_output=True, text=True)
+                return 'microsoft' in result.stdout.lower() or 'wsl' in result.stdout.lower()
+            except:
+                return False
+    
+    def convert_wsl_path_to_windows(self, wsl_path):
+        """Convert WSL path to Windows path"""
+        try:
+            # Use wslpath if available
+            result = subprocess.run(['wslpath', '-w', wsl_path], 
+                                  capture_output=True, text=True)
+            if result.returncode == 0:
+                return result.stdout.strip()
+        except:
+            pass
         
-        if not success:
-            QMessageBox.warning(
-                self, 
-                "Cannot Play Video", 
-                f"Unable to find a video player to open the file.\n"
-                f"Please install VLC, MPV, or another video player.\n\n"
-                f"File location: {file_path}\n"
-                f"Last error: {last_error}"
-            )
+        # Manual conversion as fallback
+        if wsl_path.startswith('/mnt/'):
+            # /mnt/c/path -> C:\path
+            parts = wsl_path.split('/')
+            if len(parts) >= 3:
+                drive = parts[2].upper()
+                path_parts = parts[3:]
+                windows_path = f"{drive}:\\" + "\\".join(path_parts)
+                return windows_path
+        
+        return wsl_path
+    
+    def try_wsl_video_playback(self, windows_path, linux_path):
+        """Try WSL-specific video playback methods"""
+        methods = [
+            # Method 1: Use cmd.exe to launch Windows media player
+            lambda: self.try_windows_cmd_playback(windows_path),
+            
+            # Method 2: Use powershell.exe to invoke Windows media
+            lambda: self.try_powershell_playback(windows_path),
+            
+            # Method 3: Try WSLg if available
+            lambda: self.try_wslg_playback(linux_path),
+            
+            # Method 4: Use explorer.exe to open file
+            lambda: self.try_explorer_playback(windows_path)
+        ]
+        
+        for method in methods:
+            try:
+                if method():
+                    return True
+            except Exception as e:
+                continue
+        
+        return False
+    
+    def try_windows_cmd_playback(self, windows_path):
+        """Try to play video using Windows cmd.exe"""
+        try:
+            # Use cmd.exe to start the file with default Windows association
+            subprocess.Popen([
+                'cmd.exe', '/c', 'start', '""', windows_path
+            ], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+            return True
+        except:
+            return False
+    
+    def try_powershell_playback(self, windows_path):
+        """Try to play video using PowerShell"""
+        try:
+            # Use PowerShell to invoke the file
+            ps_command = f'Invoke-Item "{windows_path}"'
+            subprocess.Popen([
+                'powershell.exe', '-Command', ps_command
+            ], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+            return True
+        except:
+            return False
+    
+    def try_wslg_playback(self, linux_path):
+        """Try to play video using WSLg (Windows Subsystem for Linux GUI)"""
+        try:
+            # Check if DISPLAY is set (indicates WSLg or X11 forwarding)
+            if 'DISPLAY' not in os.environ:
+                return False
+            
+            # Try common Linux video players that work with WSLg
+            players = ['vlc', 'mpv', 'totem', 'mplayer']
+            
+            for player in players:
+                try:
+                    # Check if player exists
+                    result = subprocess.run(['which', player], 
+                                          capture_output=True, text=True)
+                    if result.returncode == 0:
+                        # Launch the player
+                        subprocess.Popen([player, linux_path],
+                                       stderr=subprocess.DEVNULL, 
+                                       stdout=subprocess.DEVNULL)
+                        return True
+                except:
+                    continue
+            
+            return False
+        except:
+            return False
+    
+    def try_explorer_playback(self, windows_path):
+        """Try to open file using Windows Explorer"""
+        try:
+            # Use explorer.exe to open the file
+            subprocess.Popen([
+                'explorer.exe', windows_path
+            ], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+            return True
+        except:
+            return False
     
     def save_compressed(self):
         if not hasattr(self, 'compression_results'):
@@ -1953,14 +2091,15 @@ class MainWindow(QMainWindow):
             self.processor.wait(5000)
         
         self.upload_widget.setVisible(True)
+        self.main_tabs.setVisible(False)
         
-        self.upload_area.setText("Drag and drop a video file here\nor click to browse")
+        self.upload_area.setText("Drag and drop a video file here or click to browse")
         self.upload_area.setStyleSheet("""
             QLabel {
                 background-color: #2b2b2b;
-                border: 3px dashed #666;
-                border-radius: 12px;
-                font-size: 18px;
+                border: 2px dashed #666;
+                border-radius: 8px;
+                font-size: 14px;
                 color: #bbb;
                 font-weight: 500;
             }
@@ -1973,10 +2112,10 @@ class MainWindow(QMainWindow):
         
         self.compress_btn.setVisible(True)
         self.stop_btn.setVisible(False)
-        
-        self.comparison_widget.setVisible(False)
         self.progress_widget.setVisible(False)
-        self.results_widget.setVisible(False)
+        
+        # Reset to first tab
+        self.main_tabs.setCurrentIndex(0)
     
     def format_size(self, size_bytes):
         for unit in ['B', 'KB', 'MB', 'GB']:
@@ -2016,8 +2155,8 @@ class MainWindow(QMainWindow):
             event.accept()
 
     def update_batch_details(self, results):
-        details_text = "HiNeRV Batch Processing Analysis\n"
-        details_text += "=" * 60 + "\n\n"
+        details_text = "Batch Processing Analysis\n"
+        details_text += "=" * 40 + "\n\n"
         
         batch_metrics = results.get('batch_metrics', [])
         
@@ -2029,11 +2168,11 @@ class MainWindow(QMainWindow):
             frame_range = batch.get('frame_range', '--')
             frame_count = batch.get('frame_count', 0)
             
-            details_text += f"Batch {batch_idx + 1:3d}: Frames {frame_range:>10} ({frame_count:2d} frames)\n"
+            details_text += f"Batch {batch_idx + 1:2d}: Frames {frame_range:>8} ({frame_count:2d})\n"
             
             training = batch.get('training_metrics', {})
             if 'final_psnr' in training and training['final_psnr'] > 0:
-                details_text += f"             Training PSNR: {training['final_psnr']:6.2f} dB\n"
+                details_text += f"   PSNR: {training['final_psnr']:5.2f} dB\n"
             
             compression = batch.get('compression_metrics', {})
             if 'compression_ratio' in compression:
@@ -2042,24 +2181,24 @@ class MainWindow(QMainWindow):
                 fallback = compression.get('fallback_used', False)
                 
                 if fallback:
-                    details_text += f"             Status: FALLBACK (no neural compression)\n"
+                    details_text += f"   Status: FALLBACK\n"
                 else:
-                    details_text += f"             Compression: {ratio:5.2f}x ratio, {space_saved:5.1f}% saved\n"
+                    details_text += f"   Ratio: {ratio:4.2f}x, Saved: {space_saved:4.1f}%\n"
             
             details_text += "\n"
         
         total_batches = len(batch_metrics)
         fallback_count = results.get('fallback_batches', 0)
         
-        details_text += f"\nSummary Report:\n"
-        details_text += f"- Neural compression: {total_batches - fallback_count}/{total_batches} batches successful\n"
-        details_text += f"- Fallback used: {fallback_count} batches\n"
+        details_text += f"Summary:\n"
+        details_text += f"Neural: {total_batches - fallback_count}/{total_batches} batches\n"
+        details_text += f"Fallback: {fallback_count} batches\n"
         
         if results.get('avg_psnr', 0) > 0:
-            details_text += f"- Average PSNR: {results['avg_psnr']:.2f} dB\n"
+            details_text += f"Avg PSNR: {results['avg_psnr']:.2f} dB\n"
         
-        details_text += f"- Overall compression ratio: {results.get('video_compression_ratio', 1):.2f}x\n"
-        details_text += f"- Total space saved: {results.get('video_space_saved', 0)*100:.1f}%\n"
+        details_text += f"Overall: {results.get('video_compression_ratio', 1):.2f}x\n"
+        details_text += f"Saved: {results.get('video_space_saved', 0)*100:.1f}%\n"
         
         self.batch_details_text.setPlainText(details_text)
 

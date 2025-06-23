@@ -659,65 +659,11 @@ class VideoProcessor(QThread):
         self.is_running = False
 
 
-class VideoLoadWorker(QThread):
-    """Background worker for loading video information without blocking UI"""
-    video_loaded = Signal(dict)  # Signal to emit video info
-    error_occurred = Signal(str)
-    
-    def __init__(self, video_path):
-        super().__init__()
-        self.video_path = video_path
-        
-    def run(self):
-        try:
-            video_info = {}
-            video_info['path'] = self.video_path
-            
-            # Load video properties using OpenCV in background thread
-            cap = cv2.VideoCapture(self.video_path)
-            if cap.isOpened():
-                video_info['width'] = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                video_info['height'] = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                video_info['fps'] = cap.get(cv2.CAP_PROP_FPS)
-                video_info['frame_count'] = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-                video_info['duration'] = video_info['frame_count'] / video_info['fps'] if video_info['fps'] > 0 else 0
-                
-                # Get a preview frame from the middle of the video
-                cap.set(cv2.CAP_PROP_POS_FRAMES, video_info['frame_count'] // 2)
-                ret, frame = cap.read()
-                if ret:
-                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    h, w, ch = frame_rgb.shape
-                    bytes_per_line = ch * w
-                    
-                    from PySide6.QtGui import QImage
-                    q_image = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
-                    video_info['preview_image'] = q_image
-                
-                cap.release()
-            else:
-                video_info['width'] = 0
-                video_info['height'] = 0
-                video_info['fps'] = 0
-                video_info['frame_count'] = 0
-                video_info['duration'] = 0
-                video_info['preview_image'] = None
-            
-            # Get file size
-            video_info['size_bytes'] = os.path.getsize(self.video_path)
-            
-            self.video_loaded.emit(video_info)
-            
-        except Exception as e:
-            self.error_occurred.emit(f"Error loading video: {str(e)}")
-
-
 class VideoPreviewWidget(QWidget):
     def __init__(self, title="Video"):
         super().__init__()
         self.title = title
         self.video_info = VideoInfo()
-        self.load_worker = None
         self.setup_ui()
         
     def setup_ui(self):
@@ -748,7 +694,6 @@ class VideoPreviewWidget(QWidget):
             }
         """)
         self.preview_label.setAlignment(Qt.AlignCenter)
-        self.preview_label.setText("Loading...")  # Show loading text initially
         layout.addWidget(self.preview_label)
         
         info_frame = QFrame()
@@ -782,64 +727,66 @@ class VideoPreviewWidget(QWidget):
             row += 1
         
         layout.addWidget(info_frame)
+        info_layout.setSpacing(8)
+        
+        self.info_labels = {
+            'resolution': QLabel("Resolution: --"),
+            'fps': QLabel("FPS: --"),
+            'size': QLabel("Size: --"),
+            'duration': QLabel("Duration: --")
+        }
+        
+        row = 0
+        for key, label in self.info_labels.items():
+            label.setStyleSheet("""
+                color: #ddd; 
+                padding: 4px; 
+                font-size: 13px;
+                font-weight: 500;
+            """)
+            info_layout.addWidget(label, row // 2, row % 2)
+            row += 1
+        
+        layout.addWidget(info_frame)
     
     def load_video(self, video_path):
-        """Load video in background thread to prevent UI freezing"""
         if not os.path.exists(video_path):
-            self.preview_label.setText("Video file not found")
             return
         
-        # Stop any existing worker
-        if self.load_worker and self.load_worker.isRunning():
-            self.load_worker.quit()
-            self.load_worker.wait()
+        self.video_info.path = video_path
         
-        # Show loading state
-        self.preview_label.setText("Loading video...")
-        for label in self.info_labels.values():
-            label.setText(label.text().split(':')[0] + ": Loading...")
+        cap = cv2.VideoCapture(video_path)
+        if cap.isOpened():
+            self.video_info.width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            self.video_info.height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            self.video_info.fps = cap.get(cv2.CAP_PROP_FPS)
+            self.video_info.frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            self.video_info.duration = self.video_info.frame_count / self.video_info.fps if self.video_info.fps > 0 else 0
+            
+            cap.set(cv2.CAP_PROP_POS_FRAMES, self.video_info.frame_count // 2)
+            ret, frame = cap.read()
+            if ret:
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                h, w, ch = frame_rgb.shape
+                bytes_per_line = ch * w
+                
+                from PySide6.QtGui import QImage
+                q_image = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
+                pixmap = QPixmap.fromImage(q_image)
+                
+                scaled_pixmap = pixmap.scaled(
+                    self.preview_label.size(),
+                    Qt.KeepAspectRatio,
+                    Qt.SmoothTransformation
+                )
+                self.preview_label.setPixmap(scaled_pixmap)
+            
+            cap.release()
         
-        # Start background loading
-        self.load_worker = VideoLoadWorker(video_path)
-        self.load_worker.video_loaded.connect(self.on_video_loaded)
-        self.load_worker.error_occurred.connect(self.on_video_error)
-        self.load_worker.start()
-    
-    def on_video_loaded(self, video_info):
-        """Handle video loaded signal from background thread"""
-        # Update video info object
-        self.video_info.path = video_info['path']
-        self.video_info.width = video_info['width']
-        self.video_info.height = video_info['height']
-        self.video_info.fps = video_info['fps']
-        self.video_info.frame_count = video_info['frame_count']
-        self.video_info.duration = video_info['duration']
-        self.video_info.size_bytes = video_info['size_bytes']
+        self.video_info.size_bytes = os.path.getsize(video_path)
         self.video_info.size_str = self.format_size(self.video_info.size_bytes)
         
-        # Update preview image
-        if video_info.get('preview_image'):
-            pixmap = QPixmap.fromImage(video_info['preview_image'])
-            scaled_pixmap = pixmap.scaled(
-                self.preview_label.size(),
-                Qt.KeepAspectRatio,
-                Qt.SmoothTransformation
-            )
-            self.preview_label.setPixmap(scaled_pixmap)
-        else:
-            self.preview_label.setText("No preview available")
-        
-        # Update info labels
         self.update_info()
-    
-    def on_video_error(self, error_msg):
-        """Handle video loading error"""
-        self.preview_label.setText(f"Error: {error_msg}")
-        logger.error(f"Video loading error: {error_msg}")
-        
-        # Reset info labels
-        for key, label in self.info_labels.items():
-            label.setText(f"{key.title()}: Error")
     
     def update_info(self):
         self.info_labels['resolution'].setText(f"Resolution: {self.video_info.width}x{self.video_info.height}")
@@ -864,6 +811,7 @@ class VideoPreviewWidget(QWidget):
         hours = minutes // 60
         mins = minutes % 60
         return f"{hours}h {mins}m {secs}s"
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -1846,15 +1794,6 @@ class MainWindow(QMainWindow):
         success = False
         last_error = ""
         
-        # Convert WSL path to Windows path if needed
-        windows_path = self.convert_wsl_path_to_windows(file_path)
-        
-        # WSL-specific video playback methods
-        if self.is_wsl_environment():
-            success = self.try_wsl_video_playback(windows_path, file_path)
-            if success:
-                return
-        
         # Try system default first
         try:
             if sys.platform.startswith('win'):
@@ -1965,153 +1904,24 @@ class MainWindow(QMainWindow):
                 except:
                     continue
         
+        # Final fallback: try browser
         if not success:
-            # Show helpful dialog for WSL users
-            if self.is_wsl_environment():
-                QMessageBox.information(
-                    self, 
-                    "WSL Video Playback", 
-                    f"Cannot directly play video in WSL environment.\n\n"
-                    f"Options:\n"
-                    f"1. Copy this path to Windows: {windows_path}\n"
-                    f"2. Install a video player: sudo apt install vlc\n"
-                    f"3. Use Windows Subsystem for Linux GUI (WSLg)\n\n"
-                    f"File location: {file_path}"
-                )
-            else:
-                QMessageBox.warning(
-                    self, 
-                    "Cannot Play Video", 
-                    f"Unable to find a video player to open the file.\n"
-                    f"Please install VLC, MPV, or another video player.\n\n"
-                    f"File location: {file_path}\n"
-                    f"Last error: {last_error}"
-                )
-    
-    def is_wsl_environment(self):
-        """Check if running in WSL environment"""
-        try:
-            # Check for WSL-specific indicators
-            with open('/proc/version', 'r') as f:
-                version_info = f.read().lower()
-                return 'microsoft' in version_info or 'wsl' in version_info
-        except:
-            # Alternative check
             try:
-                result = subprocess.run(['uname', '-r'], capture_output=True, text=True)
-                return 'microsoft' in result.stdout.lower() or 'wsl' in result.stdout.lower()
-            except:
-                return False
-    
-    def convert_wsl_path_to_windows(self, wsl_path):
-        """Convert WSL path to Windows path"""
-        try:
-            # Use wslpath if available
-            result = subprocess.run(['wslpath', '-w', wsl_path], 
-                                  capture_output=True, text=True)
-            if result.returncode == 0:
-                return result.stdout.strip()
-        except:
-            pass
-        
-        # Manual conversion as fallback
-        if wsl_path.startswith('/mnt/'):
-            # /mnt/c/path -> C:\path
-            parts = wsl_path.split('/')
-            if len(parts) >= 3:
-                drive = parts[2].upper()
-                path_parts = parts[3:]
-                windows_path = f"{drive}:\\" + "\\".join(path_parts)
-                return windows_path
-        
-        return wsl_path
-    
-    def try_wsl_video_playback(self, windows_path, linux_path):
-        """Try WSL-specific video playback methods"""
-        methods = [
-            # Method 1: Use cmd.exe to launch Windows media player
-            lambda: self.try_windows_cmd_playback(windows_path),
-            
-            # Method 2: Use powershell.exe to invoke Windows media
-            lambda: self.try_powershell_playback(windows_path),
-            
-            # Method 3: Try WSLg if available
-            lambda: self.try_wslg_playback(linux_path),
-            
-            # Method 4: Use explorer.exe to open file
-            lambda: self.try_explorer_playback(windows_path)
-        ]
-        
-        for method in methods:
-            try:
-                if method():
-                    return True
+                file_url = f"file://{os.path.abspath(file_path)}"
+                webbrowser.open(file_url)
+                success = True
             except Exception as e:
-                continue
+                last_error = str(e)
         
-        return False
-    
-    def try_windows_cmd_playback(self, windows_path):
-        """Try to play video using Windows cmd.exe"""
-        try:
-            # Use cmd.exe to start the file with default Windows association
-            subprocess.Popen([
-                'cmd.exe', '/c', 'start', '""', windows_path
-            ], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
-            return True
-        except:
-            return False
-    
-    def try_powershell_playback(self, windows_path):
-        """Try to play video using PowerShell"""
-        try:
-            # Use PowerShell to invoke the file
-            ps_command = f'Invoke-Item "{windows_path}"'
-            subprocess.Popen([
-                'powershell.exe', '-Command', ps_command
-            ], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
-            return True
-        except:
-            return False
-    
-    def try_wslg_playback(self, linux_path):
-        """Try to play video using WSLg (Windows Subsystem for Linux GUI)"""
-        try:
-            # Check if DISPLAY is set (indicates WSLg or X11 forwarding)
-            if 'DISPLAY' not in os.environ:
-                return False
-            
-            # Try common Linux video players that work with WSLg
-            players = ['vlc', 'mpv', 'totem', 'mplayer']
-            
-            for player in players:
-                try:
-                    # Check if player exists
-                    result = subprocess.run(['which', player], 
-                                          capture_output=True, text=True)
-                    if result.returncode == 0:
-                        # Launch the player
-                        subprocess.Popen([player, linux_path],
-                                       stderr=subprocess.DEVNULL, 
-                                       stdout=subprocess.DEVNULL)
-                        return True
-                except:
-                    continue
-            
-            return False
-        except:
-            return False
-    
-    def try_explorer_playback(self, windows_path):
-        """Try to open file using Windows Explorer"""
-        try:
-            # Use explorer.exe to open the file
-            subprocess.Popen([
-                'explorer.exe', windows_path
-            ], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
-            return True
-        except:
-            return False
+        if not success:
+            QMessageBox.warning(
+                self, 
+                "Cannot Play Video", 
+                f"Unable to find a video player to open the file.\n"
+                f"Please install VLC, MPV, or another video player.\n\n"
+                f"File location: {file_path}\n"
+                f"Last error: {last_error}"
+            )
     
     def save_compressed(self):
         if not hasattr(self, 'compression_results'):
@@ -2143,15 +1953,14 @@ class MainWindow(QMainWindow):
             self.processor.wait(5000)
         
         self.upload_widget.setVisible(True)
-        self.main_tabs.setVisible(False)
         
-        self.upload_area.setText("Drag and drop a video file here or click to browse")
+        self.upload_area.setText("Drag and drop a video file here\nor click to browse")
         self.upload_area.setStyleSheet("""
             QLabel {
                 background-color: #2b2b2b;
-                border: 2px dashed #666;
-                border-radius: 8px;
-                font-size: 14px;
+                border: 3px dashed #666;
+                border-radius: 12px;
+                font-size: 18px;
                 color: #bbb;
                 font-weight: 500;
             }
@@ -2164,10 +1973,10 @@ class MainWindow(QMainWindow):
         
         self.compress_btn.setVisible(True)
         self.stop_btn.setVisible(False)
-        self.progress_widget.setVisible(False)
         
-        # Reset to first tab
-        self.main_tabs.setCurrentIndex(0)
+        self.comparison_widget.setVisible(False)
+        self.progress_widget.setVisible(False)
+        self.results_widget.setVisible(False)
     
     def format_size(self, size_bytes):
         for unit in ['B', 'KB', 'MB', 'GB']:
@@ -2207,8 +2016,8 @@ class MainWindow(QMainWindow):
             event.accept()
 
     def update_batch_details(self, results):
-        details_text = "Batch Processing Analysis\n"
-        details_text += "=" * 40 + "\n\n"
+        details_text = "HiNeRV Batch Processing Analysis\n"
+        details_text += "=" * 60 + "\n\n"
         
         batch_metrics = results.get('batch_metrics', [])
         
@@ -2220,11 +2029,11 @@ class MainWindow(QMainWindow):
             frame_range = batch.get('frame_range', '--')
             frame_count = batch.get('frame_count', 0)
             
-            details_text += f"Batch {batch_idx + 1:2d}: Frames {frame_range:>8} ({frame_count:2d})\n"
+            details_text += f"Batch {batch_idx + 1:3d}: Frames {frame_range:>10} ({frame_count:2d} frames)\n"
             
             training = batch.get('training_metrics', {})
             if 'final_psnr' in training and training['final_psnr'] > 0:
-                details_text += f"   PSNR: {training['final_psnr']:5.2f} dB\n"
+                details_text += f"             Training PSNR: {training['final_psnr']:6.2f} dB\n"
             
             compression = batch.get('compression_metrics', {})
             if 'compression_ratio' in compression:
@@ -2233,24 +2042,24 @@ class MainWindow(QMainWindow):
                 fallback = compression.get('fallback_used', False)
                 
                 if fallback:
-                    details_text += f"   Status: FALLBACK\n"
+                    details_text += f"             Status: FALLBACK (no neural compression)\n"
                 else:
-                    details_text += f"   Ratio: {ratio:4.2f}x, Saved: {space_saved:4.1f}%\n"
+                    details_text += f"             Compression: {ratio:5.2f}x ratio, {space_saved:5.1f}% saved\n"
             
             details_text += "\n"
         
         total_batches = len(batch_metrics)
         fallback_count = results.get('fallback_batches', 0)
         
-        details_text += f"Summary:\n"
-        details_text += f"Neural: {total_batches - fallback_count}/{total_batches} batches\n"
-        details_text += f"Fallback: {fallback_count} batches\n"
+        details_text += f"\nSummary Report:\n"
+        details_text += f"- Neural compression: {total_batches - fallback_count}/{total_batches} batches successful\n"
+        details_text += f"- Fallback used: {fallback_count} batches\n"
         
         if results.get('avg_psnr', 0) > 0:
-            details_text += f"Avg PSNR: {results['avg_psnr']:.2f} dB\n"
+            details_text += f"- Average PSNR: {results['avg_psnr']:.2f} dB\n"
         
-        details_text += f"Overall: {results.get('video_compression_ratio', 1):.2f}x\n"
-        details_text += f"Saved: {results.get('video_space_saved', 0)*100:.1f}%\n"
+        details_text += f"- Overall compression ratio: {results.get('video_compression_ratio', 1):.2f}x\n"
+        details_text += f"- Total space saved: {results.get('video_space_saved', 0)*100:.1f}%\n"
         
         self.batch_details_text.setPlainText(details_text)
 

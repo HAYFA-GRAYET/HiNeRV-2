@@ -16,7 +16,9 @@ from datetime import datetime
 import time
 import glob
 import math
-
+from PySide6.QtCore import QShortcut
+from PySide6.QtGui import QKeySequence
+from PySide6.QtWidgets import QTextEdit, QScrollArea
 # Qt imports
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -670,34 +672,35 @@ class VideoPreviewWidget(QWidget):
         # Title
         title_label = QLabel(self.title)
         title_label.setAlignment(Qt.AlignCenter)
-        title_label.setStyleSheet("font-size: 14px; font-weight: bold; padding: 5px;")
+        title_label.setStyleSheet("font-size: 12px; font-weight: bold; padding: 3px;")
         layout.addWidget(title_label)
         
-        # Video preview
+        # Video preview - optimized for laptop screens
         self.preview_label = QLabel()
-        self.preview_label.setMinimumSize(400, 300)
-        self.preview_label.setMaximumSize(600, 450)
+        self.preview_label.setMinimumSize(300, 200)  # Reduced from 400x300
+        self.preview_label.setMaximumSize(450, 300)  # Reduced from 600x450
         self.preview_label.setScaledContents(True)
         self.preview_label.setStyleSheet("""
             QLabel {
                 background-color: #2b2b2b;
                 border: 2px solid #444;
-                border-radius: 8px;
+                border-radius: 6px;
             }
         """)
         self.preview_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.preview_label)
         
-        # Video info
+        # Video info - more compact
         info_frame = QFrame()
         info_frame.setStyleSheet("""
             QFrame {
                 background-color: #333;
-                border-radius: 6px;
-                padding: 10px;
+                border-radius: 4px;
+                padding: 6px;
             }
         """)
         info_layout = QGridLayout(info_frame)
+        info_layout.setSpacing(2)
         
         self.info_labels = {
             'resolution': QLabel("Resolution: --"),
@@ -708,7 +711,7 @@ class VideoPreviewWidget(QWidget):
         
         row = 0
         for key, label in self.info_labels.items():
-            label.setStyleSheet("color: #ccc; padding: 3px;")
+            label.setStyleSheet("color: #ccc; padding: 1px; font-size: 11px;")
             info_layout.addWidget(label, row // 2, row % 2)
             row += 1
         
@@ -797,39 +800,42 @@ class MainWindow(QMainWindow):
         self.video_path = None
         self.output_dir = None
         self.processor = None
+        self.precompressed_mode = False  # NEW: Track if we're in precompressed mode
         self.setup_ui()
         self.apply_theme()
+        self.setup_shortcuts()  # NEW: Set up keyboard shortcuts
         
     def setup_ui(self):
-        """Set up the user interface"""
+        """Set up the user interface optimized for laptop screens"""
         self.setWindowTitle("HiNeRV Video Compressor - Batch Processing")
-        self.setMinimumSize(1200, 700)
+        self.setMinimumSize(1000, 600)  # Reduced from 1200x700
+        self.setMaximumSize(1400, 800)  # Add maximum size for laptop compatibility
         
         # Central widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
-        main_layout.setSpacing(20)
-        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(15)  # Reduced spacing
+        main_layout.setContentsMargins(15, 15, 15, 15)  # Reduced margins
         
-        # Header
+        # Header - more compact
         header = QLabel("HiNeRV Video Compressor")
         header.setAlignment(Qt.AlignCenter)
         header.setStyleSheet("""
-            font-size: 28px;
+            font-size: 24px;
             font-weight: bold;
             color: #4CAF50;
-            padding: 10px;
+            padding: 8px;
         """)
         main_layout.addWidget(header)
         
-        # Batch info
-        batch_info = QLabel("Processing in batches of 40 frames to prevent memory issues")
+        # Batch info - more compact
+        batch_info = QLabel("Processing in batches of 40 frames • Ctrl+Shift+L for pre-compressed videos")
         batch_info.setAlignment(Qt.AlignCenter)
         batch_info.setStyleSheet("""
-            font-size: 12px;
+            font-size: 11px;
             color: #888;
-            padding: 5px;
+            padding: 3px;
         """)
         main_layout.addWidget(batch_info)
         
@@ -854,7 +860,11 @@ class MainWindow(QMainWindow):
         
         # Enable drag and drop
         self.setAcceptDrops(True)
-    
+    def setup_shortcuts(self):
+        """Set up keyboard shortcuts for hidden features"""
+        # Hidden shortcut: Ctrl+Shift+L to load pre-compressed video
+        self.load_compressed_shortcut = QShortcut(QKeySequence("Ctrl+Shift+L"), self)
+        self.load_compressed_shortcut.activated.connect(self.load_precompressed_video)
     def create_upload_section(self):
         """Create the upload section"""
         widget = QGroupBox("Upload Video")
@@ -901,29 +911,99 @@ class MainWindow(QMainWindow):
         layout.addWidget(browse_btn, alignment=Qt.AlignCenter)
         
         return widget
-    
+    def load_precompressed_video(self):
+        """Hidden feature: Load pre-compressed video with existing metrics"""
+        if not self.video_path:
+            QMessageBox.warning(self, "No Original Video", "Please load an original video first.")
+            return
+        
+        if self.processor and self.processor.isRunning():
+            QMessageBox.warning(self, "Processing Active", "Cannot load pre-compressed video while processing.")
+            return
+        
+        # Ask for compressed video
+        compressed_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Pre-Compressed Video",
+            "",
+            "Video Files (*.mp4 *.avi *.mkv *.mov *.webm);;All Files (*.*)"
+        )
+        
+        if not compressed_path:
+            return
+        
+        # Ask for metrics JSON file
+        metrics_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Metrics JSON File",
+            "",
+            "JSON Files (*.json);;All Files (*.*)"
+        )
+        
+        if not metrics_path:
+            return
+        
+        try:
+            # Load metrics from JSON
+            with open(metrics_path, 'r') as f:
+                metrics = json.load(f)
+            
+            # Update metrics with current paths
+            metrics['original_path'] = self.video_path
+            metrics['compressed_path'] = compressed_path
+            
+            # Recalculate file sizes
+            metrics['original_size'] = os.path.getsize(self.video_path)
+            metrics['compressed_size'] = os.path.getsize(compressed_path)
+            metrics['video_compression_ratio'] = metrics['original_size'] / metrics['compressed_size']
+            metrics['video_space_saved'] = 1 - (metrics['compressed_size'] / metrics['original_size'])
+            
+            # Set precompressed mode
+            self.precompressed_mode = True
+            
+            # Show results as if compression just finished
+            self.on_compression_finished(metrics)
+            
+            QMessageBox.information(
+                self, 
+                "Pre-compressed Video Loaded", 
+                "Successfully loaded pre-compressed video with metrics!"
+            )
+            
+        except Exception as e:
+            QMessageBox.critical(
+                self, 
+                "Error Loading", 
+                f"Failed to load pre-compressed video or metrics:\n{str(e)}"
+            )
     def create_comparison_section(self):
-        """Create video comparison section"""
+        """Create video comparison section with enhanced layout"""
         widget = QWidget()
         layout = QVBoxLayout(widget)
         
-        # Video previews
+        # Video previews with improved sizing
         previews_layout = QHBoxLayout()
         
         self.original_preview = VideoPreviewWidget("Original Video")
         self.compressed_preview = VideoPreviewWidget("Compressed Video")
+        
+        # Set maximum sizes for laptop screens
+        for preview in [self.original_preview, self.compressed_preview]:
+            preview.setMaximumHeight(350)  # Reduced from default
+            preview.setMinimumHeight(280)  # Ensure minimum visibility
         
         previews_layout.addWidget(self.original_preview)
         previews_layout.addWidget(self.compressed_preview)
         
         layout.addLayout(previews_layout)
         
-        # Training info
-        info_widget = QGroupBox("HiNeRV Processing Info")
+        # Training info - more compact
+        info_widget = QGroupBox("Processing Info")
         info_layout = QVBoxLayout(info_widget)
         
-        info_text = QLabel("• Processing 40 frames per batch\n• Using epochs from configuration files\n• Each batch trains independently with HiNeRV")
-        info_text.setStyleSheet("color: #888; font-size: 12px; padding: 10px;")
+        info_text = QLabel("• 40 frames/batch • Config file epochs • Independent batch training\n• Shortcut: Ctrl+Shift+L to load pre-compressed video")
+        info_text.setStyleSheet("color: #888; font-size: 11px; padding: 5px;")
+        info_text.setWordWrap(True)
         info_layout.addWidget(info_text)
         
         layout.addWidget(info_widget)
@@ -935,9 +1015,9 @@ class MainWindow(QMainWindow):
                 background-color: #2196F3;
                 color: white;
                 border: none;
-                padding: 15px 30px;
+                padding: 12px 25px;
                 border-radius: 5px;
-                font-size: 16px;
+                font-size: 14px;
                 font-weight: bold;
             }
             QPushButton:hover {
@@ -954,9 +1034,9 @@ class MainWindow(QMainWindow):
                 background-color: #f44336;
                 color: white;
                 border: none;
-                padding: 15px 30px;
+                padding: 12px 25px;
                 border-radius: 5px;
-                font-size: 16px;
+                font-size: 14px;
                 font-weight: bold;
             }
             QPushButton:hover {
@@ -968,6 +1048,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.stop_btn, alignment=Qt.AlignCenter)
         
         return widget
+
     def create_progress_section(self):
         """Create progress section"""
         widget = QGroupBox("Compression Progress")
@@ -997,134 +1078,163 @@ class MainWindow(QMainWindow):
         return widget
     
     def create_results_section(self):
-        """Create comprehensive results section with detailed metrics"""
+        """Create enhanced results section optimized for laptop screens"""
         widget = QGroupBox("HiNeRV Compression Results")
         layout = QVBoxLayout(widget)
         
-        # Main results grid
+        # Create scrollable area for better laptop compatibility
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setMaximumHeight(400)  # Limit height for laptop screens
+        scroll_area.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background-color: transparent;
+            }
+            QScrollBar:vertical {
+                background-color: #444;
+                width: 12px;
+                border-radius: 6px;
+            }
+            QScrollBar::handle:vertical {
+                background-color: #666;
+                border-radius: 6px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background-color: #777;
+            }
+        """)
+        
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout(scroll_content)
+        
+        # Main results in compact grid
         main_results_frame = QFrame()
         main_results_frame.setStyleSheet("""
             QFrame {
                 background-color: #2b2b2b;
-                border-radius: 8px;
-                padding: 15px;
+                border-radius: 6px;
+                padding: 10px;
             }
         """)
         main_results_layout = QGridLayout(main_results_frame)
+        main_results_layout.setSpacing(5)  # Reduced spacing
         
-        # Video-level metrics
+        # Video-level metrics with compact labels
         self.result_labels = {
-            'original_size': QLabel("Original Size: --"),
-            'compressed_size': QLabel("Compressed Size: --"),
-            'video_compression_ratio': QLabel("Video Compression Ratio: --"),
-            'video_space_saved': QLabel("Video Space Saved: --"),
-            'avg_psnr': QLabel("Average PSNR: --"),
-            'total_batches': QLabel("Batches Processed: --"),
-            'processing_method': QLabel("Method: HiNeRV Neural Compression")
+            'original_size': QLabel("Original: --"),
+            'compressed_size': QLabel("Compressed: --"),
+            'video_compression_ratio': QLabel("Ratio: --"),
+            'video_space_saved': QLabel("Saved: --"),
+            'avg_psnr': QLabel("Avg PSNR: --"),
+            'total_batches': QLabel("Batches: --")
         }
         
         row = 0
         for key, label in self.result_labels.items():
-            label.setStyleSheet("font-size: 14px; color: #ccc; padding: 5px;")
+            label.setStyleSheet("font-size: 12px; color: #ccc; padding: 2px;")
             main_results_layout.addWidget(label, row // 2, row % 2)
             row += 1
         
-        layout.addWidget(main_results_frame)
+        scroll_layout.addWidget(main_results_frame)
         
-        # Detailed metrics section
+        # Performance indicators - horizontal layout for space efficiency
+        perf_frame = QFrame()
+        perf_frame.setStyleSheet("""
+            QFrame {
+                background-color: #333;
+                border-radius: 6px;
+                padding: 8px;
+                margin-top: 5px;
+            }
+        """)
+        perf_layout = QHBoxLayout(perf_frame)
+        perf_layout.setSpacing(10)
+        
+        self.performance_labels = {
+            'neural_success': QLabel("Neural: --"),
+            'fallback_count': QLabel("Fallback: --"),
+            'avg_frame_compression': QLabel("Frame Ratio: --")
+        }
+        
+        for label in self.performance_labels.values():
+            label.setStyleSheet("font-size: 11px; color: #ccc; padding: 2px;")
+            perf_layout.addWidget(label)
+        
+        scroll_layout.addWidget(perf_frame)
+        
+        # Compact batch details
         detailed_frame = QFrame()
         detailed_frame.setStyleSheet("""
             QFrame {
                 background-color: #333;
-                border-radius: 8px;
-                padding: 10px;
-                margin-top: 10px;
+                border-radius: 6px;
+                padding: 8px;
+                margin-top: 5px;
             }
         """)
         detailed_layout = QVBoxLayout(detailed_frame)
         
-        detailed_title = QLabel("Detailed Batch Analysis")
-        detailed_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #4CAF50; padding: 5px;")
+        detailed_title = QLabel("Batch Analysis")
+        detailed_title.setStyleSheet("font-size: 13px; font-weight: bold; color: #4CAF50; padding: 2px;")
         detailed_layout.addWidget(detailed_title)
         
-        # Scrollable area for batch details
-        from PySide6.QtWidgets import QScrollArea, QTextEdit
-        
         self.batch_details_text = QTextEdit()
-        self.batch_details_text.setMaximumHeight(150)
+        self.batch_details_text.setMaximumHeight(100)  # More compact
         self.batch_details_text.setStyleSheet("""
             QTextEdit {
                 background-color: #2b2b2b;
                 color: #ccc;
                 border: 1px solid #555;
-                border-radius: 5px;
+                border-radius: 4px;
                 font-family: monospace;
-                font-size: 11px;
+                font-size: 10px;
             }
         """)
         self.batch_details_text.setReadOnly(True)
         detailed_layout.addWidget(self.batch_details_text)
         
-        layout.addWidget(detailed_frame)
+        scroll_layout.addWidget(detailed_frame)
         
-        # Performance indicators
-        perf_frame = QFrame()
-        perf_frame.setStyleSheet("""
-            QFrame {
-                background-color: #333;
-                border-radius: 8px;
-                padding: 10px;
-                margin-top: 10px;
-            }
-        """)
-        perf_layout = QHBoxLayout(perf_frame)
+        # Set scroll area content
+        scroll_area.setWidget(scroll_content)
+        layout.addWidget(scroll_area)
         
-        self.performance_labels = {
-            'neural_success': QLabel("Neural Compression: --"),
-            'fallback_count': QLabel("Fallback Batches: --"),
-            'avg_frame_compression': QLabel("Avg Frame Compression: --")
-        }
-        
-        for label in self.performance_labels.values():
-            label.setStyleSheet("font-size: 12px; color: #ccc; padding: 3px;")
-            perf_layout.addWidget(label)
-        
-        layout.addWidget(perf_frame)
-        
-        # Action buttons
-        actions_layout = QHBoxLayout()
+        # Action buttons - more compact layout
+        actions_frame = QFrame()
+        actions_layout = QGridLayout(actions_frame)
+        actions_layout.setSpacing(5)
         
         self.play_original_btn = QPushButton("Play Original")
         self.play_compressed_btn = QPushButton("Play Compressed")
-        self.save_btn = QPushButton("Save Compressed Video")
+        self.save_btn = QPushButton("Save Video")
         self.export_metrics_btn = QPushButton("Export Metrics")
         
-        for btn in [self.play_original_btn, self.play_compressed_btn, self.save_btn, self.export_metrics_btn]:
+        buttons = [self.play_original_btn, self.play_compressed_btn, self.save_btn, self.export_metrics_btn]
+        
+        for i, btn in enumerate(buttons):
             btn.setStyleSheet("""
                 QPushButton {
                     background-color: #555;
                     color: white;
                     border: none;
-                    padding: 10px 15px;
-                    border-radius: 5px;
-                    font-size: 12px;
+                    padding: 8px 12px;
+                    border-radius: 4px;
+                    font-size: 11px;
                 }
                 QPushButton:hover {
                     background-color: #666;
                 }
             """)
+            actions_layout.addWidget(btn, i // 2, i % 2)
         
         self.play_original_btn.clicked.connect(self.play_original)
         self.play_compressed_btn.clicked.connect(self.play_compressed)
         self.save_btn.clicked.connect(self.save_compressed)
         self.export_metrics_btn.clicked.connect(self.export_metrics)
         
-        actions_layout.addWidget(self.play_original_btn)
-        actions_layout.addWidget(self.play_compressed_btn)
-        actions_layout.addWidget(self.save_btn)
-        actions_layout.addWidget(self.export_metrics_btn)
-        
-        layout.addLayout(actions_layout)
+        layout.addWidget(actions_frame)
         
         # New compression button
         new_btn = QPushButton("Compress Another Video")
@@ -1133,11 +1243,11 @@ class MainWindow(QMainWindow):
                 background-color: #4CAF50;
                 color: white;
                 border: none;
-                padding: 12px 25px;
+                padding: 10px 20px;
                 border-radius: 5px;
-                font-size: 14px;
+                font-size: 12px;
                 font-weight: bold;
-                margin-top: 10px;
+                margin-top: 5px;
             }
             QPushButton:hover {
                 background-color: #45a049;
@@ -1207,6 +1317,15 @@ class MainWindow(QMainWindow):
     def start_compression(self):
         """Start the compression process using config file epochs"""
         if not self.video_path:
+            return
+        
+        # Check if we're in precompressed mode
+        if self.precompressed_mode:
+            QMessageBox.information(
+                self, 
+                "Pre-compressed Mode", 
+                "This video was loaded with pre-existing compression results.\nUse 'Compress Another Video' to start fresh."
+            )
             return
         
         # Create output directory
@@ -1393,6 +1512,7 @@ class MainWindow(QMainWindow):
         """Reset UI for new compression"""
         self.video_path = None
         self.output_dir = None
+        self.precompressed_mode = False  # NEW: Reset precompressed mode
         
         # Stop any running processor
         if self.processor and self.processor.isRunning():

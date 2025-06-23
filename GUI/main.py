@@ -1791,154 +1791,137 @@ class MainWindow(QMainWindow):
                 self.open_video_file(compressed_path)
     
     def open_video_file(self, file_path):
-        """Open video file with VLC in WSL environment"""
         success = False
         last_error = ""
         
-        # Convert Windows path to WSL path if needed
-        wsl_file_path = file_path
+        # Try system default first
+        try:
+            if sys.platform.startswith('win'):
+                os.startfile(file_path)
+                return
+            elif sys.platform.startswith('darwin'):
+                subprocess.run(['open', file_path], check=True)
+                return
+            else:
+                subprocess.run(['xdg-open', file_path], check=True, 
+                             stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                return
+        except Exception as e:
+            last_error = str(e)
         
-        # If the path contains Windows drive letters, convert to WSL format
-        if ':' in file_path and len(file_path) > 1 and file_path[1] == ':':
-            # Convert C:\path\to\file to /mnt/c/path/to/file
-            drive_letter = file_path[0].lower()
-            path_without_drive = file_path[2:].replace('\\', '/')
-            wsl_file_path = f"/mnt/{drive_letter}{path_without_drive}"
-        
-        # Try VLC in WSL first (most likely to work)
-        vlc_commands = [
-            ['vlc', wsl_file_path],
-            ['vlc', '--intf', 'qt', wsl_file_path],
-            ['vlc', '--intf', 'dummy', '--play-and-exit', wsl_file_path],
-            ['/usr/bin/vlc', wsl_file_path],
-            ['snap', 'run', 'vlc', wsl_file_path],
-            ['flatpak', 'run', 'org.videolan.VLC', wsl_file_path]
-        ]
-        
-        for cmd in vlc_commands:
-            try:
-                # Check if the command exists
-                check_cmd = ['which', cmd[0]]
-                result = subprocess.run(check_cmd, capture_output=True, text=True)
-                if result.returncode != 0:
-                    continue
-                
-                # Set DISPLAY for X11 forwarding if not set
-                env = os.environ.copy()
-                if 'DISPLAY' not in env:
-                    env['DISPLAY'] = ':0'
-                
-                # Try to launch VLC
-                process = subprocess.Popen(
-                    cmd,
-                    env=env,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    start_new_session=True
-                )
-                
-                # Wait a moment to see if it starts successfully
-                import time
-                time.sleep(0.5)
-                
-                if process.poll() is None:  # Process is still running
-                    success = True
-                    logger.info(f"Successfully launched VLC with command: {' '.join(cmd)}")
-                    break
-                else:
-                    # Process exited immediately, try next command
-                    stdout, stderr = process.communicate()
-                    last_error = f"Command {cmd[0]} exited with code {process.returncode}: {stderr.decode()}"
-                    continue
-                    
-            except Exception as e:
-                last_error = f"Failed to run {cmd[0]}: {str(e)}"
-                continue
-        
-        # If VLC didn't work, try other media players available in WSL
-        if not success:
-            other_players = [
-                ['mpv', wsl_file_path],
-                ['mplayer', wsl_file_path],
-                ['totem', wsl_file_path],
-                ['celluloid', wsl_file_path],
-                ['gnome-videos', wsl_file_path]
+        # Try specific video players
+        video_players = []
+        if sys.platform.startswith('win'):
+            video_players = [
+                ['vlc.exe', file_path],
+                ['wmplayer.exe', file_path],
+                ['mpc-hc.exe', file_path],
+                ['mpc-hc64.exe', file_path],
+                ['potplayer.exe', file_path]
             ]
-            
-            for cmd in other_players:
-                try:
-                    # Check if player exists
-                    check_cmd = ['which', cmd[0]]
-                    result = subprocess.run(check_cmd, capture_output=True, text=True)
+        elif sys.platform.startswith('darwin'):
+            video_players = [
+                ['open', '-a', 'VLC', file_path],
+                ['open', '-a', 'QuickTime Player', file_path],
+                ['open', '-a', 'IINA', file_path],
+                ['open', '-a', 'Elmedia Player', file_path]
+            ]
+        else:
+            # Linux/Unix systems
+            video_players = [
+                ['vlc', file_path],
+                ['mpv', file_path],
+                ['totem', file_path],
+                ['mplayer', file_path],
+                ['smplayer', file_path],
+                ['kaffeine', file_path],
+                ['dragon', file_path],
+                ['celluloid', file_path],
+                ['gnome-videos', file_path],
+                ['parole', file_path]
+            ]
+        
+        for player_cmd in video_players:
+            try:
+                # Check if player exists
+                if sys.platform.startswith('win'):
+                    result = subprocess.run(['where', player_cmd[0]], 
+                                          capture_output=True, text=True)
                     if result.returncode != 0:
                         continue
-                    
-                    # Set environment for X11
-                    env = os.environ.copy()
-                    if 'DISPLAY' not in env:
-                        env['DISPLAY'] = ':0'
-                    
-                    # Launch player
-                    process = subprocess.Popen(
-                        cmd,
-                        env=env,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        start_new_session=True
-                    )
-                    
-                    # Check if it started successfully
-                    import time
-                    time.sleep(0.5)
-                    
-                    if process.poll() is None:
-                        success = True
-                        logger.info(f"Successfully launched {cmd[0]}")
-                        break
-                    else:
-                        stdout, stderr = process.communicate()
-                        last_error = f"{cmd[0]} exited with code {process.returncode}: {stderr.decode()}"
+                else:
+                    result = subprocess.run(['which', player_cmd[0]], 
+                                          capture_output=True, text=True)
+                    if result.returncode != 0:
                         continue
-                        
-                except Exception as e:
-                    last_error = f"Failed to run {cmd[0]}: {str(e)}"
+                
+                # Try to launch the player
+                subprocess.Popen(player_cmd, 
+                               stderr=subprocess.DEVNULL, 
+                               stdout=subprocess.DEVNULL)
+                success = True
+                break
+            except Exception as e:
+                last_error = str(e)
+                continue
+        
+        # Try flatpak apps on Linux
+        if not success and not sys.platform.startswith('win') and not sys.platform.startswith('darwin'):
+            flatpak_players = [
+                ['flatpak', 'run', 'org.videolan.VLC', file_path],
+                ['flatpak', 'run', 'io.github.celluloid_player.Celluloid', file_path],
+                ['flatpak', 'run', 'org.gnome.Totem', file_path]
+            ]
+            
+            for player_cmd in flatpak_players:
+                try:
+                    subprocess.run(['which', 'flatpak'], check=True, 
+                                 capture_output=True)
+                    subprocess.Popen(player_cmd,
+                                   stderr=subprocess.DEVNULL, 
+                                   stdout=subprocess.DEVNULL)
+                    success = True
+                    break
+                except:
                     continue
         
-        # If nothing worked, show helpful error message
-        if not success:
-            error_msg = (
-                f"Unable to open video file in WSL.\n\n"
-                f"File path: {file_path}\n"
-                f"WSL path: {wsl_file_path}\n\n"
-                f"Troubleshooting tips:\n"
-                f"1. Make sure VLC is installed: sudo apt install vlc\n"
-                f"2. Ensure X11 forwarding is enabled\n"
-                f"3. Try setting DISPLAY: export DISPLAY=:0\n"
-                f"4. Install VcXsrv or similar X server on Windows\n\n"
-                f"Last error: {last_error}\n\n"
-                f"You can manually open the file with:\n"
-                f"vlc '{wsl_file_path}'"
-            )
+        # Try snap apps on Linux
+        if not success and not sys.platform.startswith('win') and not sys.platform.startswith('darwin'):
+            snap_players = [
+                ['snap', 'run', 'vlc', file_path],
+                ['snap', 'run', 'mpv', file_path]
+            ]
             
-            # Create a more detailed error dialog
-            error_dialog = QMessageBox(self)
-            error_dialog.setWindowTitle("Video Player Error")
-            error_dialog.setText("Cannot open video file")
-            error_dialog.setDetailedText(error_msg)
-            error_dialog.setIcon(QMessageBox.Warning)
-            
-            # Add a button to copy the command
-            copy_button = error_dialog.addButton("Copy VLC Command", QMessageBox.ActionRole)
-            error_dialog.addButton(QMessageBox.Ok)
-            
-            error_dialog.exec()
-            
-            if error_dialog.clickedButton() == copy_button:
-                clipboard = QApplication.clipboard()
-                clipboard.setText(f"vlc '{wsl_file_path}'")
-                QMessageBox.information(self, "Copied", "VLC command copied to clipboard!")
+            for player_cmd in snap_players:
+                try:
+                    subprocess.run(['which', 'snap'], check=True, 
+                                 capture_output=True)
+                    subprocess.Popen(player_cmd,
+                                   stderr=subprocess.DEVNULL, 
+                                   stdout=subprocess.DEVNULL)
+                    success = True
+                    break
+                except:
+                    continue
         
-        return success
+        # Final fallback: try browser
+        if not success:
+            try:
+                file_url = f"file://{os.path.abspath(file_path)}"
+                webbrowser.open(file_url)
+                success = True
+            except Exception as e:
+                last_error = str(e)
+        
+        if not success:
+            QMessageBox.warning(
+                self, 
+                "Cannot Play Video", 
+                f"Unable to find a video player to open the file.\n"
+                f"Please install VLC, MPV, or another video player.\n\n"
+                f"File location: {file_path}\n"
+                f"Last error: {last_error}"
+            )
     
     def save_compressed(self):
         if not hasattr(self, 'compression_results'):
